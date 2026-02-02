@@ -9,6 +9,7 @@ import {
   User,
   LogOut,
   Shield,
+  LogIn,
 } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { useAuthStore } from '../../store/useAuthStore';
@@ -19,6 +20,7 @@ import SchemaHelper from './SchemaHelper';
 import TableList from './TableList';
 import InferencePanel from './InferencePanel';
 import { Branding } from '../common/Branding';
+import { toast } from '../common/Toast';
 
 type TabType = 'sql' | 'schema' | 'tables' | 'infer';
 
@@ -35,7 +37,7 @@ const Sidebar: React.FC = () => {
   const [showDialectDropdown, setShowDialectDropdown] = useState(false);
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   const { tables, pendingInferences, sqlDialect, setSqlDialect } = useStore();
-  const { user, subscription, logout, setShowPremiumModal } = useAuthStore();
+  const { user, subscription, logout, setShowPremiumModal, setShowAuthPage, isAdmin } = useAuthStore();
   const { setShowAdminPanel, loadDemoData } = useAdminStore();
 
   const tabs = [
@@ -48,9 +50,25 @@ const Sidebar: React.FC = () => {
   const currentDialect = DIALECT_OPTIONS.find(d => d.id === sqlDialect) || DIALECT_OPTIONS[0];
 
   const handleOpenAdmin = () => {
+    if (!isAdmin()) {
+      toast.error('Access Denied', 'Admin access requires login with admin credentials');
+      setShowUserDropdown(false);
+      return;
+    }
     loadDemoData(); // Load demo data for the admin panel
     setShowAdminPanel(true);
     setShowUserDropdown(false);
+  };
+
+  const handleLogout = () => {
+    logout();
+    setShowUserDropdown(false);
+    toast.info('Signed out', 'You have been signed out successfully');
+  };
+
+  const handleSignIn = () => {
+    setShowUserDropdown(false);
+    setShowAuthPage(true);
   };
 
   const getTierBadge = () => {
@@ -112,6 +130,12 @@ const Sidebar: React.FC = () => {
                         {getTierBadge()}
                       </div>
                       <p className="text-xs text-slate-400 truncate">{user.email}</p>
+                      {isAdmin() && (
+                        <div className="flex items-center gap-1 mt-1.5">
+                          <Shield className="w-3 h-3 text-red-400" />
+                          <span className="text-[10px] text-red-400 font-medium">Administrator</span>
+                        </div>
+                      )}
                     </div>
                     {subscription.tier === 'free' && (
                       <button
@@ -125,18 +149,17 @@ const Sidebar: React.FC = () => {
                         Upgrade to Pro
                       </button>
                     )}
+                    {isAdmin() && (
+                      <button
+                        onClick={handleOpenAdmin}
+                        className="w-full px-3 py-2.5 text-sm text-left text-red-400 hover:bg-slate-600 transition-colors flex items-center gap-2"
+                      >
+                        <Shield className="w-4 h-4" />
+                        Admin Panel
+                      </button>
+                    )}
                     <button
-                      onClick={handleOpenAdmin}
-                      className="w-full px-3 py-2.5 text-sm text-left text-red-400 hover:bg-slate-600 transition-colors flex items-center gap-2"
-                    >
-                      <Shield className="w-4 h-4" />
-                      Admin Panel
-                    </button>
-                    <button
-                      onClick={() => {
-                        logout();
-                        setShowUserDropdown(false);
-                      }}
+                      onClick={handleLogout}
                       className="w-full px-3 py-2.5 text-sm text-left text-slate-300 hover:bg-slate-600 transition-colors flex items-center gap-2"
                     >
                       <LogOut className="w-4 h-4" />
@@ -150,31 +173,28 @@ const Sidebar: React.FC = () => {
                       <p className="text-xs text-slate-500">Sign in to save your progress</p>
                     </div>
                     <button
-                      onClick={() => {
-                        setShowUserDropdown(false);
-                        setShowPremiumModal(true, 'upgrade');
-                      }}
+                      onClick={handleSignIn}
                       className="w-full px-3 py-2.5 text-sm text-left text-white hover:bg-slate-600 transition-colors flex items-center gap-2"
                     >
+                      <LogIn className="w-4 h-4" />
+                      Sign In
+                    </button>
+                    <button
+                      onClick={handleSignIn}
+                      className="w-full px-3 py-2.5 text-sm text-left text-blue-400 hover:bg-slate-600 transition-colors flex items-center gap-2"
+                    >
                       <User className="w-4 h-4" />
-                      Sign In / Sign Up
+                      Create Account
                     </button>
                     <button
                       onClick={() => {
                         setShowUserDropdown(false);
                         setShowPremiumModal(true, 'upgrade');
                       }}
-                      className="w-full px-3 py-2.5 text-sm text-left text-yellow-400 hover:bg-slate-600 transition-colors flex items-center gap-2"
+                      className="w-full px-3 py-2.5 text-sm text-left text-yellow-400 hover:bg-slate-600 transition-colors flex items-center gap-2 border-t border-slate-600"
                     >
                       <Crown className="w-4 h-4" />
                       Get Pro
-                    </button>
-                    <button
-                      onClick={handleOpenAdmin}
-                      className="w-full px-3 py-2.5 text-sm text-left text-red-400 hover:bg-slate-600 transition-colors flex items-center gap-2 border-t border-slate-600"
-                    >
-                      <Shield className="w-4 h-4" />
-                      Admin Panel
                     </button>
                   </>
                 )}

@@ -3,6 +3,9 @@ import { persist } from 'zustand/middleware';
 import type { User, Subscription, UsageStats, SubscriptionFeatures } from '../types';
 import { FREE_TIER_LIMITS, PRO_TIER_FEATURES, ENTERPRISE_TIER_FEATURES } from '../types';
 
+// Admin emails - in production, this would be checked server-side
+const ADMIN_EMAILS = ['admin@schemaflow.io', 'admin@example.com'];
+
 interface AuthStore {
   // State
   user: User | null;
@@ -10,6 +13,7 @@ interface AuthStore {
   usage: UsageStats;
   showPremiumModal: boolean;
   showUsageLimitModal: boolean;
+  showAuthPage: boolean;
   premiumModalTrigger: 'limit' | 'feature' | 'upgrade' | null;
 
   // Auth Actions
@@ -17,6 +21,8 @@ interface AuthStore {
   login: (email: string, password: string) => Promise<boolean>;
   register: (email: string, password: string, name?: string) => Promise<boolean>;
   logout: () => void;
+  isAuthenticated: () => boolean;
+  isAdmin: () => boolean;
 
   // Subscription Actions
   setSubscription: (subscription: Subscription) => void;
@@ -32,6 +38,7 @@ interface AuthStore {
   // Modal Actions
   setShowPremiumModal: (show: boolean, trigger?: 'limit' | 'feature' | 'upgrade') => void;
   setShowUsageLimitModal: (show: boolean) => void;
+  setShowAuthPage: (show: boolean) => void;
 
   // Feature Checks
   hasFeature: (feature: keyof SubscriptionFeatures) => boolean;
@@ -71,14 +78,18 @@ export const useAuthStore = create<AuthStore>()(
       usage: initialUsage,
       showPremiumModal: false,
       showUsageLimitModal: false,
+      showAuthPage: false,
       premiumModalTrigger: null,
 
       // Auth Actions
       setUser: (user) => set({ user }),
 
       login: async (email, _password) => {
-        // Simulated login - in production, this would call an API
+        // Simulated login - in production, this would call an API with proper validation
         await new Promise(resolve => setTimeout(resolve, 1000));
+
+        // Check for admin email
+        const isAdminUser = ADMIN_EMAILS.includes(email.toLowerCase());
 
         const user: User = {
           id: `user-${Date.now()}`,
@@ -87,7 +98,12 @@ export const useAuthStore = create<AuthStore>()(
           createdAt: new Date(),
         };
 
-        set({ user });
+        // Admin users get enterprise features
+        const subscription: Subscription = isAdminUser
+          ? { tier: 'enterprise', features: ENTERPRISE_TIER_FEATURES }
+          : initialSubscription;
+
+        set({ user, subscription, showAuthPage: false });
         return true;
       },
 
@@ -102,14 +118,26 @@ export const useAuthStore = create<AuthStore>()(
           createdAt: new Date(),
         };
 
-        set({ user });
+        set({ user, showAuthPage: false });
         return true;
       },
 
       logout: () => set({
         user: null,
-        subscription: initialSubscription
+        subscription: initialSubscription,
+        showAuthPage: false,
       }),
+
+      isAuthenticated: () => {
+        const { user } = get();
+        return user !== null;
+      },
+
+      isAdmin: () => {
+        const { user } = get();
+        if (!user) return false;
+        return ADMIN_EMAILS.includes(user.email.toLowerCase());
+      },
 
       // Subscription Actions
       setSubscription: (subscription) => set({ subscription }),
@@ -217,6 +245,8 @@ export const useAuthStore = create<AuthStore>()(
       }),
 
       setShowUsageLimitModal: (show) => set({ showUsageLimitModal: show }),
+
+      setShowAuthPage: (show) => set({ showAuthPage: show }),
 
       // Feature Checks
       hasFeature: (feature) => {

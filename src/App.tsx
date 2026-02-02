@@ -7,6 +7,8 @@ import { WelcomeModal } from './components/common/WelcomeModal';
 import { PremiumModal } from './components/common/PremiumModal';
 import { UsageLimitModal } from './components/common/UsageLimitModal';
 import { AdminPanel } from './components/admin/AdminPanel';
+import { AuthPage } from './components/auth/AuthPage';
+import { ToastContainer, toast } from './components/common/Toast';
 import { useStore } from './store/useStore';
 import { useAuthStore } from './store/useAuthStore';
 import { useAdminStore } from './store/useAdminStore';
@@ -17,13 +19,17 @@ const App: React.FC = () => {
   const {
     showPremiumModal,
     showUsageLimitModal,
+    showAuthPage,
     setShowPremiumModal,
-    setShowUsageLimitModal
+    setShowUsageLimitModal,
+    setShowAuthPage,
+    isAdmin,
   } = useAuthStore();
   const { showAdminPanel, setShowAdminPanel } = useAdminStore();
 
   const handleLoadDemo = useCallback(() => {
     loadDemo(DEMO_TABLES, DEMO_RELATIONSHIPS, DEMO_SQL_QUERIES);
+    toast.success('Demo loaded!', 'E-commerce schema has been loaded');
   }, [loadDemo]);
 
   const handleStartFresh = useCallback(() => {
@@ -48,6 +54,22 @@ const App: React.FC = () => {
     setShowAdminPanel(false);
   }, [setShowAdminPanel]);
 
+  // Security check for admin panel
+  const handleOpenAdminPanel = useCallback(() => {
+    if (!isAdmin()) {
+      toast.error('Access Denied', 'You do not have permission to access the admin panel');
+      setShowAdminPanel(false);
+      return;
+    }
+  }, [isAdmin, setShowAdminPanel]);
+
+  // Check admin access when panel opens
+  useEffect(() => {
+    if (showAdminPanel) {
+      handleOpenAdminPanel();
+    }
+  }, [showAdminPanel, handleOpenAdminPanel]);
+
   // Handle escape key to close modals
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -60,12 +82,35 @@ const App: React.FC = () => {
           handleCloseUsageLimitModal();
         } else if (showWelcome) {
           handleStartFresh();
+        } else if (showAuthPage) {
+          setShowAuthPage(false);
         }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showWelcome, showPremiumModal, showUsageLimitModal, showAdminPanel, handleStartFresh, handleClosePremiumModal, handleCloseUsageLimitModal, handleCloseAdminPanel]);
+  }, [
+    showWelcome,
+    showPremiumModal,
+    showUsageLimitModal,
+    showAdminPanel,
+    showAuthPage,
+    handleStartFresh,
+    handleClosePremiumModal,
+    handleCloseUsageLimitModal,
+    handleCloseAdminPanel,
+    setShowAuthPage,
+  ]);
+
+  // Show auth page if requested
+  if (showAuthPage) {
+    return (
+      <>
+        <AuthPage />
+        <ToastContainer />
+      </>
+    );
+  }
 
   return (
     <ReactFlowProvider>
@@ -103,10 +148,13 @@ const App: React.FC = () => {
           />
         )}
 
-        {/* Admin Panel */}
-        {showAdminPanel && (
+        {/* Admin Panel - Only show if user is admin */}
+        {showAdminPanel && isAdmin() && (
           <AdminPanel onClose={handleCloseAdminPanel} />
         )}
+
+        {/* Toast Notifications */}
+        <ToastContainer />
       </div>
     </ReactFlowProvider>
   );
