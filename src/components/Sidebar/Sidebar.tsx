@@ -1,41 +1,84 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
-  Database,
   Code,
+  Database,
   Table2,
   Sparkles,
+  ChevronDown,
 } from 'lucide-react';
 import { useStore } from '../../store/useStore';
+import type { SQLDialect } from '../../store/useStore';
 import SQLInput from './SQLInput';
 import SchemaHelper from './SchemaHelper';
 import TableList from './TableList';
 import InferencePanel from './InferencePanel';
+import { Branding } from '../common/Branding';
 
 type TabType = 'sql' | 'schema' | 'tables' | 'infer';
 
+const DIALECT_OPTIONS: { id: SQLDialect; label: string }[] = [
+  { id: 'sql', label: 'SQL (Standard)' },
+  { id: 'mysql', label: 'MySQL' },
+  { id: 'postgres', label: 'PostgreSQL' },
+  { id: 'sqlite', label: 'SQLite' },
+  { id: 'sqlserver', label: 'SQL Server' },
+];
+
 const Sidebar: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('sql');
-  const { tables, pendingInferences } = useStore();
+  const [showDialectDropdown, setShowDialectDropdown] = useState(false);
+  const { tables, pendingInferences, sqlDialect, setSqlDialect } = useStore();
 
   const tabs = [
-    { id: 'sql' as TabType, label: 'SQL Input', icon: Code },
-    { id: 'schema' as TabType, label: 'Schema Helper', icon: Database },
+    { id: 'sql' as TabType, label: 'SQL', icon: Code },
+    { id: 'schema' as TabType, label: 'Schema', icon: Database },
     { id: 'tables' as TabType, label: 'Tables', icon: Table2, count: tables.length },
-    { id: 'infer' as TabType, label: 'Inferences', icon: Sparkles, count: pendingInferences.length },
+    { id: 'infer' as TabType, label: 'AI', icon: Sparkles, count: pendingInferences.length },
   ];
+
+  const currentDialect = DIALECT_OPTIONS.find(d => d.id === sqlDialect) || DIALECT_OPTIONS[0];
 
   return (
     <div className="w-96 h-full bg-slate-800 border-r border-slate-700 flex flex-col">
-      {/* Header */}
+      {/* Header with Branding */}
       <div className="p-4 border-b border-slate-700">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-            <Database className="w-5 h-5 text-white" />
-          </div>
-          <div>
-            <h1 className="font-bold text-white">Schema Designer</h1>
-            <p className="text-xs text-slate-400">ERD Visualization Tool</p>
-          </div>
+        <div className="flex items-center justify-between">
+          <Branding size="md" showTagline />
+        </div>
+
+        {/* SQL Dialect Selector */}
+        <div className="mt-4 relative">
+          <button
+            onClick={() => setShowDialectDropdown(!showDialectDropdown)}
+            className="w-full flex items-center justify-between px-3 py-2 bg-slate-700/50 rounded-lg text-sm text-slate-300 hover:bg-slate-700 transition-colors"
+          >
+            <span className="flex items-center gap-2">
+              <Code className="w-4 h-4 text-blue-400" />
+              {currentDialect.label}
+            </span>
+            <ChevronDown className={`w-4 h-4 transition-transform ${showDialectDropdown ? 'rotate-180' : ''}`} />
+          </button>
+
+          {showDialectDropdown && (
+            <div className="absolute top-full left-0 right-0 mt-1 bg-slate-700 rounded-lg shadow-xl border border-slate-600 z-50 overflow-hidden animate-slideIn">
+              {DIALECT_OPTIONS.map((dialect) => (
+                <button
+                  key={dialect.id}
+                  onClick={() => {
+                    setSqlDialect(dialect.id);
+                    setShowDialectDropdown(false);
+                  }}
+                  className={`w-full px-3 py-2 text-sm text-left transition-colors flex items-center gap-2 ${
+                    sqlDialect === dialect.id
+                      ? 'bg-blue-600 text-white'
+                      : 'text-slate-300 hover:bg-slate-600'
+                  }`}
+                >
+                  {dialect.label}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
@@ -46,7 +89,7 @@ const Sidebar: React.FC = () => {
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
             className={`
-              flex-1 py-3 px-2 text-xs font-medium transition-colors relative
+              flex-1 py-3 px-2 text-xs font-medium transition-all relative
               flex items-center justify-center gap-1.5
               ${activeTab === tab.id
                 ? 'text-blue-400 bg-slate-700/50'
@@ -55,17 +98,17 @@ const Sidebar: React.FC = () => {
             `}
           >
             <tab.icon className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">{tab.label}</span>
+            <span>{tab.label}</span>
             {tab.count !== undefined && tab.count > 0 && (
               <span className={`
-                ml-1 px-1.5 py-0.5 text-xs rounded-full
-                ${activeTab === tab.id ? 'bg-blue-500/30 text-blue-300' : 'bg-slate-600 text-slate-300'}
+                px-1.5 py-0.5 text-[10px] rounded-full font-semibold
+                ${activeTab === tab.id ? 'bg-blue-500 text-white' : 'bg-slate-600 text-slate-300'}
               `}>
                 {tab.count}
               </span>
             )}
             {activeTab === tab.id && (
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-500" />
+              <div className="absolute bottom-0 left-2 right-2 h-0.5 bg-blue-500 rounded-full" />
             )}
           </button>
         ))}

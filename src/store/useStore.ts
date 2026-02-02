@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import type { Table, Relationship, ChatMessage, ViewMode, InferredRelationship, Column } from '../types';
 
+export type SQLDialect = 'sql' | 'mysql' | 'postgres' | 'sqlite' | 'sqlserver';
+
 interface ERDStore {
   // State
   tables: Table[];
@@ -13,6 +15,9 @@ interface ERDStore {
   sqlInput: string;
   schemaInput: string;
   isProcessing: boolean;
+  sqlDialect: SQLDialect;
+  showWelcome: boolean;
+  isDemoMode: boolean;
 
   // Table Actions
   addTable: (table: Table) => void;
@@ -51,40 +56,51 @@ interface ERDStore {
   setSqlInput: (sql: string) => void;
   setSchemaInput: (schema: string) => void;
   setIsProcessing: (processing: boolean) => void;
+  setSqlDialect: (dialect: SQLDialect) => void;
+
+  // UI Actions
+  setShowWelcome: (show: boolean) => void;
+  loadDemo: (tables: Table[], relationships: Relationship[], sql: string) => void;
 
   // Reset
   reset: () => void;
 }
 
+const createWelcomeMessage = (): ChatMessage => ({
+  id: 'welcome',
+  role: 'assistant' as const,
+  content: `Welcome to **SchemaFlow**! I'm here to help you visualize and design your database schema.
+
+**Quick Start:**
+
+1. **Paste SQL** - Add your queries or CREATE TABLE statements
+2. **Auto-detect** - I'll find tables and relationships automatically
+3. **Refine** - Review inferred connections and adjust as needed
+4. **Export** - Download your professional ERD diagram
+
+Try the interactive demo or paste your own SQL to begin!`,
+  timestamp: new Date(),
+  suggestions: [
+    'Load demo schema',
+    'Paste my SQL',
+    'How does this work?'
+  ]
+});
+
 const initialState = {
-  tables: [],
-  relationships: [],
-  selectedTable: null,
-  selectedRelationship: null,
-  chatMessages: [{
-    id: 'welcome',
-    role: 'assistant' as const,
-    content: `Welcome to the Database Schema Designer! I can help you visualize and design your database schema.
-
-**How to get started:**
-
-1. **Paste SQL queries** - I'll extract tables and relationships from your JOINs
-2. **Import schema** - Provide your database schema and I'll map it out
-3. **Ask questions** - I can help refine relationships and suggest improvements
-
-What would you like to do?`,
-    timestamp: new Date(),
-    suggestions: [
-      'Import from SQL queries',
-      'Generate schema SQL helper',
-      'Create a new table manually'
-    ]
-  }],
+  tables: [] as Table[],
+  relationships: [] as Relationship[],
+  selectedTable: null as string | null,
+  selectedRelationship: null as string | null,
+  chatMessages: [createWelcomeMessage()],
   viewMode: 'design' as ViewMode,
-  pendingInferences: [],
+  pendingInferences: [] as InferredRelationship[],
   sqlInput: '',
   schemaInput: '',
   isProcessing: false,
+  sqlDialect: 'sql' as SQLDialect,
+  showWelcome: true,
+  isDemoMode: false,
 };
 
 export const useStore = create<ERDStore>((set, get) => ({
@@ -176,7 +192,7 @@ export const useStore = create<ERDStore>((set, get) => ({
     }]
   })),
 
-  clearChat: () => set({ chatMessages: initialState.chatMessages }),
+  clearChat: () => set({ chatMessages: [createWelcomeMessage()] }),
 
   // View Actions
   setViewMode: (mode) => set({ viewMode: mode }),
@@ -217,7 +233,53 @@ export const useStore = create<ERDStore>((set, get) => ({
   setSqlInput: (sql) => set({ sqlInput: sql }),
   setSchemaInput: (schema) => set({ schemaInput: schema }),
   setIsProcessing: (processing) => set({ isProcessing: processing }),
+  setSqlDialect: (dialect) => set({ sqlDialect: dialect }),
+
+  // UI Actions
+  setShowWelcome: (show) => set({ showWelcome: show }),
+
+  loadDemo: (tables, relationships, sql) => {
+    const { addChatMessage } = get();
+
+    set({
+      tables,
+      relationships,
+      sqlInput: sql,
+      showWelcome: false,
+      isDemoMode: true,
+      pendingInferences: [],
+    });
+
+    addChatMessage({
+      role: 'assistant',
+      content: `I've loaded an **e-commerce database demo** with ${tables.length} tables and ${relationships.length} relationships.
+
+This schema includes:
+- **users** - Customer accounts
+- **products** - Product catalog
+- **categories** - Product categories
+- **orders** - Customer orders
+- **order_items** - Order line items
+- **addresses** - Shipping addresses
+
+Feel free to explore! You can:
+- **Drag tables** to rearrange the layout
+- **Click columns** to see connections
+- **Export** your diagram as PNG or SVG
+
+Try asking me questions about the schema!`,
+      suggestions: [
+        'Show relationships',
+        'Export diagram',
+        'Clear and start fresh'
+      ]
+    });
+  },
 
   // Reset
-  reset: () => set(initialState),
+  reset: () => set({
+    ...initialState,
+    showWelcome: false,
+    chatMessages: [createWelcomeMessage()],
+  }),
 }));
