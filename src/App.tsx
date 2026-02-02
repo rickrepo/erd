@@ -6,8 +6,10 @@ import ChatPanel from './components/Chat/ChatPanel';
 import { WelcomeModal } from './components/common/WelcomeModal';
 import { PremiumModal } from './components/common/PremiumModal';
 import { UsageLimitModal } from './components/common/UsageLimitModal';
+import { AdminPanel } from './components/admin/AdminPanel';
 import { useStore } from './store/useStore';
 import { useAuthStore } from './store/useAuthStore';
+import { useAdminStore } from './store/useAdminStore';
 import { DEMO_TABLES, DEMO_RELATIONSHIPS, DEMO_SQL_QUERIES } from './utils/demoData';
 
 const App: React.FC = () => {
@@ -18,6 +20,7 @@ const App: React.FC = () => {
     setShowPremiumModal,
     setShowUsageLimitModal
   } = useAuthStore();
+  const { showAdminPanel, setShowAdminPanel } = useAdminStore();
 
   const handleLoadDemo = useCallback(() => {
     loadDemo(DEMO_TABLES, DEMO_RELATIONSHIPS, DEMO_SQL_QUERIES);
@@ -41,11 +44,17 @@ const App: React.FC = () => {
     setShowPremiumModal(true, 'limit');
   }, [setShowUsageLimitModal, setShowPremiumModal]);
 
+  const handleCloseAdminPanel = useCallback(() => {
+    setShowAdminPanel(false);
+  }, [setShowAdminPanel]);
+
   // Handle escape key to close modals
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        if (showPremiumModal) {
+        if (showAdminPanel) {
+          handleCloseAdminPanel();
+        } else if (showPremiumModal) {
           handleClosePremiumModal();
         } else if (showUsageLimitModal) {
           handleCloseUsageLimitModal();
@@ -56,7 +65,7 @@ const App: React.FC = () => {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showWelcome, showPremiumModal, showUsageLimitModal, handleStartFresh, handleClosePremiumModal, handleCloseUsageLimitModal]);
+  }, [showWelcome, showPremiumModal, showUsageLimitModal, showAdminPanel, handleStartFresh, handleClosePremiumModal, handleCloseUsageLimitModal, handleCloseAdminPanel]);
 
   return (
     <ReactFlowProvider>
@@ -92,6 +101,11 @@ const App: React.FC = () => {
             onClose={handleCloseUsageLimitModal}
             onUpgrade={handleUpgradeFromLimit}
           />
+        )}
+
+        {/* Admin Panel */}
+        {showAdminPanel && (
+          <AdminPanel onClose={handleCloseAdminPanel} />
         )}
       </div>
     </ReactFlowProvider>

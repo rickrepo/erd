@@ -8,9 +8,11 @@ import {
   Crown,
   User,
   LogOut,
+  Shield,
 } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { useAuthStore } from '../../store/useAuthStore';
+import { useAdminStore } from '../../store/useAdminStore';
 import type { SQLDialect } from '../../store/useStore';
 import SQLInput from './SQLInput';
 import SchemaHelper from './SchemaHelper';
@@ -34,6 +36,7 @@ const Sidebar: React.FC = () => {
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   const { tables, pendingInferences, sqlDialect, setSqlDialect } = useStore();
   const { user, subscription, logout, setShowPremiumModal } = useAuthStore();
+  const { setShowAdminPanel, loadDemoData } = useAdminStore();
 
   const tabs = [
     { id: 'sql' as TabType, label: 'SQL', icon: Code },
@@ -43,6 +46,12 @@ const Sidebar: React.FC = () => {
   ];
 
   const currentDialect = DIALECT_OPTIONS.find(d => d.id === sqlDialect) || DIALECT_OPTIONS[0];
+
+  const handleOpenAdmin = () => {
+    loadDemoData(); // Load demo data for the admin panel
+    setShowAdminPanel(true);
+    setShowUserDropdown(false);
+  };
 
   const getTierBadge = () => {
     switch (subscription.tier) {
@@ -117,6 +126,13 @@ const Sidebar: React.FC = () => {
                       </button>
                     )}
                     <button
+                      onClick={handleOpenAdmin}
+                      className="w-full px-3 py-2.5 text-sm text-left text-red-400 hover:bg-slate-600 transition-colors flex items-center gap-2"
+                    >
+                      <Shield className="w-4 h-4" />
+                      Admin Panel
+                    </button>
+                    <button
                       onClick={() => {
                         logout();
                         setShowUserDropdown(false);
@@ -152,6 +168,13 @@ const Sidebar: React.FC = () => {
                     >
                       <Crown className="w-4 h-4" />
                       Get Pro
+                    </button>
+                    <button
+                      onClick={handleOpenAdmin}
+                      className="w-full px-3 py-2.5 text-sm text-left text-red-400 hover:bg-slate-600 transition-colors flex items-center gap-2 border-t border-slate-600"
+                    >
+                      <Shield className="w-4 h-4" />
+                      Admin Panel
                     </button>
                   </>
                 )}
