@@ -5,8 +5,12 @@ import {
   Table2,
   Sparkles,
   ChevronDown,
+  Crown,
+  User,
+  LogOut,
 } from 'lucide-react';
 import { useStore } from '../../store/useStore';
+import { useAuthStore } from '../../store/useAuthStore';
 import type { SQLDialect } from '../../store/useStore';
 import SQLInput from './SQLInput';
 import SchemaHelper from './SchemaHelper';
@@ -27,7 +31,9 @@ const DIALECT_OPTIONS: { id: SQLDialect; label: string }[] = [
 const Sidebar: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('sql');
   const [showDialectDropdown, setShowDialectDropdown] = useState(false);
+  const [showUserDropdown, setShowUserDropdown] = useState(false);
   const { tables, pendingInferences, sqlDialect, setSqlDialect } = useStore();
+  const { user, subscription, logout, setShowPremiumModal } = useAuthStore();
 
   const tabs = [
     { id: 'sql' as TabType, label: 'SQL', icon: Code },
@@ -38,12 +44,120 @@ const Sidebar: React.FC = () => {
 
   const currentDialect = DIALECT_OPTIONS.find(d => d.id === sqlDialect) || DIALECT_OPTIONS[0];
 
+  const getTierBadge = () => {
+    switch (subscription.tier) {
+      case 'pro':
+        return (
+          <span className="px-2 py-0.5 bg-gradient-to-r from-blue-500 to-purple-500 text-white text-[10px] font-bold rounded-full">
+            PRO
+          </span>
+        );
+      case 'enterprise':
+        return (
+          <span className="px-2 py-0.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-[10px] font-bold rounded-full">
+            ENTERPRISE
+          </span>
+        );
+      default:
+        return (
+          <span className="px-2 py-0.5 bg-slate-600 text-slate-300 text-[10px] font-semibold rounded-full">
+            FREE
+          </span>
+        );
+    }
+  };
+
   return (
     <div className="w-96 h-full bg-slate-800 border-r border-slate-700 flex flex-col">
       {/* Header with Branding */}
       <div className="p-4 border-b border-slate-700">
         <div className="flex items-center justify-between">
           <Branding size="md" showTagline />
+
+          {/* User Account */}
+          <div className="relative">
+            <button
+              onClick={() => setShowUserDropdown(!showUserDropdown)}
+              className="flex items-center gap-2 p-1.5 hover:bg-slate-700 rounded-lg transition-colors"
+            >
+              {user ? (
+                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-sm font-medium">
+                  {user.name?.charAt(0).toUpperCase() || user.email.charAt(0).toUpperCase()}
+                </div>
+              ) : (
+                <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center">
+                  <User className="w-4 h-4 text-slate-400" />
+                </div>
+              )}
+            </button>
+
+            {showUserDropdown && (
+              <div className="absolute top-full right-0 mt-1 w-56 bg-slate-700 rounded-lg shadow-xl border border-slate-600 z-50 overflow-hidden animate-slideIn">
+                {user ? (
+                  <>
+                    <div className="p-3 border-b border-slate-600">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-sm font-medium text-white truncate">
+                          {user.name || user.email}
+                        </span>
+                        {getTierBadge()}
+                      </div>
+                      <p className="text-xs text-slate-400 truncate">{user.email}</p>
+                    </div>
+                    {subscription.tier === 'free' && (
+                      <button
+                        onClick={() => {
+                          setShowUserDropdown(false);
+                          setShowPremiumModal(true, 'upgrade');
+                        }}
+                        className="w-full px-3 py-2.5 text-sm text-left text-yellow-400 hover:bg-slate-600 transition-colors flex items-center gap-2"
+                      >
+                        <Crown className="w-4 h-4" />
+                        Upgrade to Pro
+                      </button>
+                    )}
+                    <button
+                      onClick={() => {
+                        logout();
+                        setShowUserDropdown(false);
+                      }}
+                      className="w-full px-3 py-2.5 text-sm text-left text-slate-300 hover:bg-slate-600 transition-colors flex items-center gap-2"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      Sign Out
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <div className="p-3 border-b border-slate-600">
+                      <p className="text-sm text-slate-300 mb-1">Not signed in</p>
+                      <p className="text-xs text-slate-500">Sign in to save your progress</p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setShowUserDropdown(false);
+                        setShowPremiumModal(true, 'upgrade');
+                      }}
+                      className="w-full px-3 py-2.5 text-sm text-left text-white hover:bg-slate-600 transition-colors flex items-center gap-2"
+                    >
+                      <User className="w-4 h-4" />
+                      Sign In / Sign Up
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowUserDropdown(false);
+                        setShowPremiumModal(true, 'upgrade');
+                      }}
+                      className="w-full px-3 py-2.5 text-sm text-left text-yellow-400 hover:bg-slate-600 transition-colors flex items-center gap-2"
+                    >
+                      <Crown className="w-4 h-4" />
+                      Get Pro
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* SQL Dialect Selector */}

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Play, Upload, FileText, AlertCircle, CheckCircle } from 'lucide-react';
+import { Play, Upload, FileText, AlertCircle, CheckCircle, Crown } from 'lucide-react';
 import { useStore } from '../../store/useStore';
+import { useAuthStore } from '../../store/useAuthStore';
 import {
   parseSQLQueries,
   parseCreateTableStatements,
@@ -70,11 +71,21 @@ const SQLInput: React.FC = () => {
     setIsProcessing,
   } = useStore();
 
+  const {
+    incrementUsage,
+    canGenerate,
+    getRemainingGenerations,
+    subscription,
+  } = useAuthStore();
+
   const [parseResult, setParseResult] = useState<{
     success: boolean;
     message: string;
     details?: string;
   } | null>(null);
+
+  const remainingGenerations = getRemainingGenerations();
+  const isFreeTier = subscription.tier === 'free';
 
   const handleParse = () => {
     if (!sqlInput.trim()) {
@@ -82,6 +93,18 @@ const SQLInput: React.FC = () => {
         success: false,
         message: 'Please enter SQL queries or CREATE TABLE statements',
       });
+      return;
+    }
+
+    // Check usage limits
+    if (!canGenerate()) {
+      // The incrementUsage function will show the usage limit modal
+      incrementUsage();
+      return;
+    }
+
+    // Increment usage (this will also check and show modal if needed)
+    if (!incrementUsage()) {
       return;
     }
 
@@ -269,12 +292,27 @@ ${inferred.length > 0
         </div>
       )}
 
+      {/* Usage Indicator */}
+      {isFreeTier && (
+        <div className="mt-3 flex items-center justify-between px-1">
+          <div className="flex items-center gap-1.5 text-xs text-slate-400">
+            <Crown className="w-3.5 h-3.5 text-yellow-500" />
+            <span>
+              {remainingGenerations} generation{remainingGenerations !== 1 ? 's' : ''} remaining today
+            </span>
+          </div>
+          {remainingGenerations <= 1 && (
+            <span className="text-xs text-amber-400">Low!</span>
+          )}
+        </div>
+      )}
+
       {/* Parse Button */}
       <button
         onClick={handleParse}
         disabled={isProcessing || !sqlInput.trim()}
         className={`
-          mt-4 w-full py-3 rounded-lg font-medium flex items-center justify-center gap-2 transition-all
+          mt-3 w-full py-3 rounded-lg font-medium flex items-center justify-center gap-2 transition-all
           ${isProcessing || !sqlInput.trim()
             ? 'bg-slate-700 text-slate-500 cursor-not-allowed'
             : 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white shadow-lg shadow-blue-500/25'

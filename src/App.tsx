@@ -4,11 +4,20 @@ import Sidebar from './components/Sidebar/Sidebar';
 import ERDCanvas from './components/ERD/ERDCanvas';
 import ChatPanel from './components/Chat/ChatPanel';
 import { WelcomeModal } from './components/common/WelcomeModal';
+import { PremiumModal } from './components/common/PremiumModal';
+import { UsageLimitModal } from './components/common/UsageLimitModal';
 import { useStore } from './store/useStore';
+import { useAuthStore } from './store/useAuthStore';
 import { DEMO_TABLES, DEMO_RELATIONSHIPS, DEMO_SQL_QUERIES } from './utils/demoData';
 
 const App: React.FC = () => {
   const { showWelcome, setShowWelcome, loadDemo, reset } = useStore();
+  const {
+    showPremiumModal,
+    showUsageLimitModal,
+    setShowPremiumModal,
+    setShowUsageLimitModal
+  } = useAuthStore();
 
   const handleLoadDemo = useCallback(() => {
     loadDemo(DEMO_TABLES, DEMO_RELATIONSHIPS, DEMO_SQL_QUERIES);
@@ -19,16 +28,35 @@ const App: React.FC = () => {
     setShowWelcome(false);
   }, [reset, setShowWelcome]);
 
-  // Handle escape key to close welcome modal
+  const handleClosePremiumModal = useCallback(() => {
+    setShowPremiumModal(false);
+  }, [setShowPremiumModal]);
+
+  const handleCloseUsageLimitModal = useCallback(() => {
+    setShowUsageLimitModal(false);
+  }, [setShowUsageLimitModal]);
+
+  const handleUpgradeFromLimit = useCallback(() => {
+    setShowUsageLimitModal(false);
+    setShowPremiumModal(true, 'limit');
+  }, [setShowUsageLimitModal, setShowPremiumModal]);
+
+  // Handle escape key to close modals
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && showWelcome) {
-        handleStartFresh();
+      if (e.key === 'Escape') {
+        if (showPremiumModal) {
+          handleClosePremiumModal();
+        } else if (showUsageLimitModal) {
+          handleCloseUsageLimitModal();
+        } else if (showWelcome) {
+          handleStartFresh();
+        }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showWelcome, handleStartFresh]);
+  }, [showWelcome, showPremiumModal, showUsageLimitModal, handleStartFresh, handleClosePremiumModal, handleCloseUsageLimitModal]);
 
   return (
     <ReactFlowProvider>
@@ -50,6 +78,19 @@ const App: React.FC = () => {
             onClose={handleStartFresh}
             onLoadDemo={handleLoadDemo}
             onStartFresh={handleStartFresh}
+          />
+        )}
+
+        {/* Premium Modal */}
+        {showPremiumModal && (
+          <PremiumModal onClose={handleClosePremiumModal} />
+        )}
+
+        {/* Usage Limit Modal */}
+        {showUsageLimitModal && (
+          <UsageLimitModal
+            onClose={handleCloseUsageLimitModal}
+            onUpgrade={handleUpgradeFromLimit}
           />
         )}
       </div>

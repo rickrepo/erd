@@ -88,3 +88,59 @@ export interface AppState {
   sqlInput: string;
   schemaInput: string;
 }
+
+// User & Subscription Types
+export type SubscriptionTier = 'free' | 'pro' | 'enterprise';
+
+export interface User {
+  id: string;
+  email: string;
+  name?: string;
+  avatarUrl?: string;
+  createdAt: Date;
+}
+
+export interface Subscription {
+  tier: SubscriptionTier;
+  expiresAt?: Date;
+  features: SubscriptionFeatures;
+}
+
+export interface SubscriptionFeatures {
+  maxGenerationsPerDay: number;
+  aiMatchingEnabled: boolean;
+  exportWithoutWatermark: boolean;
+  prioritySupport: boolean;
+  customBranding: boolean;
+}
+
+export interface UsageStats {
+  generationsToday: number;
+  generationsTotal: number;
+  lastGenerationAt?: Date;
+  lastResetDate: string; // ISO date string for daily reset
+}
+
+export const FREE_TIER_LIMITS: SubscriptionFeatures = {
+  maxGenerationsPerDay: 3,
+  aiMatchingEnabled: false,
+  exportWithoutWatermark: false,
+  prioritySupport: false,
+  customBranding: false,
+};
+
+export const PRO_TIER_FEATURES: SubscriptionFeatures = {
+  maxGenerationsPerDay: 100,
+  aiMatchingEnabled: true,
+  exportWithoutWatermark: true,
+  prioritySupport: true,
+  customBranding: false,
+};
+
+export const ENTERPRISE_TIER_FEATURES: SubscriptionFeatures = {
+  maxGenerationsPerDay: Infinity,
+  aiMatchingEnabled: true,
+  exportWithoutWatermark: true,
+  prioritySupport: true,
+  customBranding: true,
+};

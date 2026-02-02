@@ -1,0 +1,252 @@
+import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
+import type { User, Subscription, UsageStats, SubscriptionFeatures } from '../types';
+import { FREE_TIER_LIMITS, PRO_TIER_FEATURES, ENTERPRISE_TIER_FEATURES } from '../types';
+
+interface AuthStore {
+  // State
+  user: User | null;
+  subscription: Subscription;
+  usage: UsageStats;
+  showPremiumModal: boolean;
+  showUsageLimitModal: boolean;
+  premiumModalTrigger: 'limit' | 'feature' | 'upgrade' | null;
+
+  // Auth Actions
+  setUser: (user: User | null) => void;
+  login: (email: string, password: string) => Promise<boolean>;
+  register: (email: string, password: string, name?: string) => Promise<boolean>;
+  logout: () => void;
+
+  // Subscription Actions
+  setSubscription: (subscription: Subscription) => void;
+  upgradeToPro: () => Promise<boolean>;
+  upgradeToEnterprise: () => Promise<boolean>;
+
+  // Usage Actions
+  incrementUsage: () => boolean;
+  canGenerate: () => boolean;
+  getRemainingGenerations: () => number;
+  resetDailyUsage: () => void;
+
+  // Modal Actions
+  setShowPremiumModal: (show: boolean, trigger?: 'limit' | 'feature' | 'upgrade') => void;
+  setShowUsageLimitModal: (show: boolean) => void;
+
+  // Feature Checks
+  hasFeature: (feature: keyof SubscriptionFeatures) => boolean;
+  getFeatures: () => SubscriptionFeatures;
+}
+
+const getTodayDateString = () => new Date().toISOString().split('T')[0];
+
+const getFeaturesByTier = (tier: 'free' | 'pro' | 'enterprise'): SubscriptionFeatures => {
+  switch (tier) {
+    case 'pro':
+      return PRO_TIER_FEATURES;
+    case 'enterprise':
+      return ENTERPRISE_TIER_FEATURES;
+    default:
+      return FREE_TIER_LIMITS;
+  }
+};
+
+const initialUsage: UsageStats = {
+  generationsToday: 0,
+  generationsTotal: 0,
+  lastResetDate: getTodayDateString(),
+};
+
+const initialSubscription: Subscription = {
+  tier: 'free',
+  features: FREE_TIER_LIMITS,
+};
+
+export const useAuthStore = create<AuthStore>()(
+  persist(
+    (set, get) => ({
+      // Initial State
+      user: null,
+      subscription: initialSubscription,
+      usage: initialUsage,
+      showPremiumModal: false,
+      showUsageLimitModal: false,
+      premiumModalTrigger: null,
+
+      // Auth Actions
+      setUser: (user) => set({ user }),
+
+      login: async (email, _password) => {
+        // Simulated login - in production, this would call an API
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+        const user: User = {
+          id: `user-${Date.now()}`,
+          email,
+          name: email.split('@')[0],
+          createdAt: new Date(),
+        };
+
+        set({ user });
+        return true;
+      },
+
+      register: async (email, _password, name) => {
+        // Simulated registration - in production, this would call an API
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+        const user: User = {
+          id: `user-${Date.now()}`,
+          email,
+          name: name || email.split('@')[0],
+          createdAt: new Date(),
+        };
+
+        set({ user });
+        return true;
+      },
+
+      logout: () => set({
+        user: null,
+        subscription: initialSubscription
+      }),
+
+      // Subscription Actions
+      setSubscription: (subscription) => set({ subscription }),
+
+      upgradeToPro: async () => {
+        // Simulated upgrade - in production, this would integrate with Stripe/payment
+        await new Promise(resolve => setTimeout(resolve, 1500));
+
+        const newSubscription: Subscription = {
+          tier: 'pro',
+          expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 year
+          features: PRO_TIER_FEATURES,
+        };
+
+        set({
+          subscription: newSubscription,
+          showPremiumModal: false,
+          showUsageLimitModal: false,
+        });
+        return true;
+      },
+
+      upgradeToEnterprise: async () => {
+        // Simulated enterprise upgrade
+        await new Promise(resolve => setTimeout(resolve, 1500));
+
+        const newSubscription: Subscription = {
+          tier: 'enterprise',
+          expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+          features: ENTERPRISE_TIER_FEATURES,
+        };
+
+        set({
+          subscription: newSubscription,
+          showPremiumModal: false,
+          showUsageLimitModal: false,
+        });
+        return true;
+      },
+
+      // Usage Actions
+      incrementUsage: () => {
+        const { usage, canGenerate, resetDailyUsage } = get();
+
+        // Check if we need to reset daily usage
+        const today = getTodayDateString();
+        if (usage.lastResetDate !== today) {
+          resetDailyUsage();
+        }
+
+        if (!canGenerate()) {
+          set({ showUsageLimitModal: true });
+          return false;
+        }
+
+        set({
+          usage: {
+            ...usage,
+            generationsToday: usage.generationsToday + 1,
+            generationsTotal: usage.generationsTotal + 1,
+            lastGenerationAt: new Date(),
+            lastResetDate: today,
+          }
+        });
+
+        return true;
+      },
+
+      canGenerate: () => {
+        const { usage, subscription } = get();
+
+        // Check if we need to reset daily usage
+        const today = getTodayDateString();
+        const currentGenerations = usage.lastResetDate !== today ? 0 : usage.generationsToday;
+
+        return currentGenerations < subscription.features.maxGenerationsPerDay;
+      },
+
+      getRemainingGenerations: () => {
+        const { usage, subscription } = get();
+
+        // Check if we need to reset daily usage
+        const today = getTodayDateString();
+        const currentGenerations = usage.lastResetDate !== today ? 0 : usage.generationsToday;
+
+        const remaining = subscription.features.maxGenerationsPerDay - currentGenerations;
+        return Math.max(0, remaining);
+      },
+
+      resetDailyUsage: () => {
+        const { usage } = get();
+        set({
+          usage: {
+            ...usage,
+            generationsToday: 0,
+            lastResetDate: getTodayDateString(),
+          }
+        });
+      },
+
+      // Modal Actions
+      setShowPremiumModal: (show, trigger) => set({
+        showPremiumModal: show,
+        premiumModalTrigger: trigger || null,
+      }),
+
+      setShowUsageLimitModal: (show) => set({ showUsageLimitModal: show }),
+
+      // Feature Checks
+      hasFeature: (feature) => {
+        const { subscription } = get();
+        const value = subscription.features[feature];
+        if (typeof value === 'boolean') return value;
+        if (typeof value === 'number') return value > 0;
+        return false;
+      },
+
+      getFeatures: () => {
+        const { subscription } = get();
+        return subscription.features;
+      },
+    }),
+    {
+      name: 'schemaflow-auth',
+      partialize: (state) => ({
+        user: state.user,
+        subscription: state.subscription,
+        usage: state.usage,
+      }),
+      merge: (persistedState, currentState) => {
+        const persisted = persistedState as Partial<AuthStore> | undefined;
+        if (persisted?.subscription?.tier) {
+          // Ensure features are properly loaded based on tier
+          persisted.subscription.features = getFeaturesByTier(persisted.subscription.tier);
+        }
+        return { ...currentState, ...persisted };
+      },
+    }
+  )
+);
