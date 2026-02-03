@@ -1,9 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User, Sparkles, ChevronRight, Trash2, Minimize2 } from 'lucide-react';
+import { Send, Bot, User, Sparkles, ChevronRight, Trash2, Minimize2, Crown } from 'lucide-react';
 import { useStore } from '../../store/useStore';
+import { useAuthStore } from '../../store/useAuthStore';
 
 const ChatPanel: React.FC = () => {
   const { chatMessages, addChatMessage, clearChat, tables, relationships } = useStore();
+  const { hasFeature, setShowPremiumModal } = useAuthStore();
   const [input, setInput] = useState('');
   const [isMinimized, setIsMinimized] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -48,8 +50,14 @@ const ChatPanel: React.FC = () => {
   };
 
   const formatMessage = (content: string) => {
-    // Simple markdown-like formatting
-    return content
+    // Sanitize HTML entities first to prevent XSS
+    const sanitized = content
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+    // Then apply markdown-like formatting
+    return sanitized
       .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
       .replace(/`(.*?)`/g, '<code class="text-blue-300 bg-slate-700 px-1 rounded">$1</code>')
       .replace(/\n/g, '<br />');
@@ -164,6 +172,24 @@ const ChatPanel: React.FC = () => {
         ))}
         <div ref={messagesEndRef} />
       </div>
+
+      {/* AI Upgrade Banner */}
+      {!hasFeature('aiMatchingEnabled') && tables.length > 0 && (
+        <div className="mx-4 mb-2">
+          <button
+            onClick={() => setShowPremiumModal(true, 'feature')}
+            className="w-full p-3 rounded-lg bg-gradient-to-r from-purple-900/40 to-blue-900/40 border border-purple-700/30 hover:border-purple-500/50 transition-all text-left group"
+          >
+            <div className="flex items-center gap-2 mb-1">
+              <Crown className="w-3.5 h-3.5 text-yellow-400" />
+              <span className="text-xs font-medium text-purple-300">Upgrade to Pro</span>
+            </div>
+            <p className="text-[11px] text-slate-400">
+              Get AI-powered relationship detection for smarter schema analysis
+            </p>
+          </button>
+        </div>
+      )}
 
       {/* Input */}
       <div className="p-4 border-t border-slate-700">

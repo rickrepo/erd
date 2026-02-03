@@ -1,8 +1,9 @@
 import { useState, useCallback } from 'react';
 import { toPng, toSvg } from 'html-to-image';
-import { Download, Image, FileCode, Loader2, Check, Settings2 } from 'lucide-react';
+import { Download, Image, FileCode, Loader2, Check, Settings2, Crown } from 'lucide-react';
 import { useReactFlow, getNodesBounds, getViewportForBounds } from '@xyflow/react';
 import { BrandingWatermark } from '../common/Branding';
+import { useAuthStore } from '../../store/useAuthStore';
 
 interface ExportPanelProps {
   onClose: () => void;
@@ -18,9 +19,12 @@ const QUALITY_SETTINGS: Record<ExportQuality, { scale: number; label: string }> 
 };
 
 export function ExportPanel({ onClose }: ExportPanelProps) {
+  const { hasFeature, setShowPremiumModal } = useAuthStore();
+  const canRemoveWatermark = hasFeature('exportWithoutWatermark');
+
   const [format, setFormat] = useState<ExportFormat>('png');
   const [quality, setQuality] = useState<ExportQuality>('high');
-  const [includeBranding, setIncludeBranding] = useState(true);
+  const [includeBranding, setIncludeBranding] = useState(!canRemoveWatermark);
   const [transparentBg, setTransparentBg] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [exported, setExported] = useState(false);
@@ -225,15 +229,31 @@ export function ExportPanel({ onClose }: ExportPanelProps) {
 
         {/* Options */}
         <div className="space-y-3">
-          <label className="flex items-center gap-3 cursor-pointer group">
+          <label className={`flex items-center gap-3 group ${canRemoveWatermark ? 'cursor-pointer' : ''}`}>
             <input
               type="checkbox"
-              checked={includeBranding}
-              onChange={(e) => setIncludeBranding(e.target.checked)}
-              className="w-4 h-4 rounded border-slate-600 bg-slate-700 text-blue-600 focus:ring-blue-500 focus:ring-offset-slate-800"
+              checked={canRemoveWatermark ? includeBranding : true}
+              onChange={(e) => {
+                if (canRemoveWatermark) {
+                  setIncludeBranding(e.target.checked);
+                } else {
+                  setShowPremiumModal(true, 'feature');
+                }
+              }}
+              disabled={!canRemoveWatermark}
+              className="w-4 h-4 rounded border-slate-600 bg-slate-700 text-blue-600 focus:ring-blue-500 focus:ring-offset-slate-800 disabled:opacity-50"
             />
-            <span className="text-sm text-slate-300 group-hover:text-white transition-colors">
+            <span className="text-sm text-slate-300 group-hover:text-white transition-colors flex items-center gap-2">
               Include SchemaFlow branding
+              {!canRemoveWatermark && (
+                <button
+                  onClick={() => setShowPremiumModal(true, 'feature')}
+                  className="px-1.5 py-0.5 text-[9px] font-bold text-yellow-400 bg-yellow-400/10 rounded-full flex items-center gap-0.5 hover:bg-yellow-400/20 transition-colors"
+                >
+                  <Crown className="w-2.5 h-2.5" />
+                  PRO to remove
+                </button>
+              )}
             </span>
           </label>
 

@@ -6,6 +6,7 @@ import {
   Eye,
   EyeOff,
   ArrowRight,
+  ArrowLeft,
   Loader2,
   AlertCircle,
   CheckCircle,
@@ -15,6 +16,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { useAuthStore } from '../../store/useAuthStore';
+import { toast } from '../common/Toast';
 
 type AuthView = 'login' | 'register' | 'forgot';
 
@@ -26,7 +28,7 @@ interface FormErrors {
 }
 
 export function AuthPage() {
-  const { login, register } = useAuthStore();
+  const { login, register, setShowAuthPage } = useAuthStore();
   const [view, setView] = useState<AuthView>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -85,12 +87,12 @@ export function AuthPage() {
     try {
       if (view === 'login') {
         await login(email, password);
-        setSuccessMessage('Login successful! Redirecting...');
+        toast.success('Welcome back!', 'You have been signed in successfully');
       } else if (view === 'register') {
         await register(email, password, name);
-        setSuccessMessage('Account created successfully!');
+        toast.success('Account created!', 'Welcome to SchemaFlow');
       }
-    } catch (error) {
+    } catch {
       setErrorMessage(
         view === 'login'
           ? 'Invalid email or password. Please try again.'
@@ -183,7 +185,16 @@ export function AuthPage() {
       </div>
 
       {/* Right Panel - Auth Form */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-8">
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 relative">
+        {/* Back to App Button */}
+        <button
+          onClick={() => setShowAuthPage(false)}
+          className="absolute top-6 left-6 flex items-center gap-2 text-sm text-slate-400 hover:text-white transition-colors group"
+        >
+          <ArrowLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" />
+          Back to app
+        </button>
+
         <div className="w-full max-w-md">
           {/* Mobile Logo */}
           <div className="lg:hidden flex items-center justify-center gap-3 mb-8">
@@ -446,6 +457,19 @@ export function AuthPage() {
                 Back to sign in
               </button>
             )}
+          </div>
+
+          {/* Continue without signing in */}
+          <div className="mt-6 pt-6 border-t border-slate-800">
+            <button
+              onClick={() => setShowAuthPage(false)}
+              className="w-full py-2.5 text-sm text-slate-500 hover:text-slate-300 transition-colors"
+            >
+              Continue without signing in
+            </button>
+            <p className="text-xs text-slate-600 text-center mt-1">
+              Full SQL parsing and ERD generation available for free
+            </p>
           </div>
         </div>
       </div>

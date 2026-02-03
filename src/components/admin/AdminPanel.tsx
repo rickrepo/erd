@@ -133,14 +133,15 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
   };
 
   const handleExportLogs = () => {
+    const escapeCSV = (val: string) => `"${val.replace(/"/g, '""')}"`;
     const csv = [
       ['Timestamp', 'User Email', 'Action', 'Details'].join(','),
       ...filteredLogs.map(log =>
         [
-          new Date(log.timestamp).toISOString(),
-          log.userEmail,
-          log.action,
-          `"${log.details}"`,
+          escapeCSV(new Date(log.timestamp).toISOString()),
+          escapeCSV(log.userEmail),
+          escapeCSV(log.action),
+          escapeCSV(log.details),
         ].join(',')
       ),
     ].join('\n');

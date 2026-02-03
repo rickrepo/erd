@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Code,
   Database,
@@ -36,8 +36,24 @@ const Sidebar: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('sql');
   const [showDialectDropdown, setShowDialectDropdown] = useState(false);
   const [showUserDropdown, setShowUserDropdown] = useState(false);
+  const userDropdownRef = useRef<HTMLDivElement>(null);
+  const dialectDropdownRef = useRef<HTMLDivElement>(null);
   const { tables, pendingInferences, sqlDialect, setSqlDialect } = useStore();
   const { user, subscription, logout, setShowPremiumModal, setShowAuthPage, isAdmin } = useAuthStore();
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (userDropdownRef.current && !userDropdownRef.current.contains(e.target as Node)) {
+        setShowUserDropdown(false);
+      }
+      if (dialectDropdownRef.current && !dialectDropdownRef.current.contains(e.target as Node)) {
+        setShowDialectDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
   const { setShowAdminPanel, loadDemoData } = useAdminStore();
 
   const tabs = [
@@ -102,7 +118,7 @@ const Sidebar: React.FC = () => {
           <Branding size="md" showTagline />
 
           {/* User Account */}
-          <div className="relative">
+          <div className="relative" ref={userDropdownRef}>
             <button
               onClick={() => setShowUserDropdown(!showUserDropdown)}
               className="flex items-center gap-2 p-1.5 hover:bg-slate-700 rounded-lg transition-colors"
@@ -204,7 +220,7 @@ const Sidebar: React.FC = () => {
         </div>
 
         {/* SQL Dialect Selector */}
-        <div className="mt-4 relative">
+        <div className="mt-4 relative" ref={dialectDropdownRef}>
           <button
             onClick={() => setShowDialectDropdown(!showDialectDropdown)}
             className="w-full flex items-center justify-between px-3 py-2 bg-slate-700/50 rounded-lg text-sm text-slate-300 hover:bg-slate-700 transition-colors"

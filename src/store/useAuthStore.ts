@@ -3,8 +3,13 @@ import { persist } from 'zustand/middleware';
 import type { User, Subscription, UsageStats, SubscriptionFeatures } from '../types';
 import { FREE_TIER_LIMITS, PRO_TIER_FEATURES, ENTERPRISE_TIER_FEATURES } from '../types';
 
-// Admin emails - in production, this would be checked server-side
-const ADMIN_EMAILS = ['admin@schemaflow.io', 'admin@example.com'];
+// Admin accounts - in production, this would be validated server-side with hashed passwords
+const ADMIN_ACCOUNTS: Record<string, string> = {
+  'admin@schemaflow.io': 'SchemaFlow2024!',
+  'admin@example.com': 'Admin@2024Secure',
+};
+
+const ADMIN_EMAILS = Object.keys(ADMIN_ACCOUNTS);
 
 interface AuthStore {
   // State
@@ -84,17 +89,30 @@ export const useAuthStore = create<AuthStore>()(
       // Auth Actions
       setUser: (user) => set({ user }),
 
-      login: async (email, _password) => {
+      login: async (email, password) => {
         // Simulated login - in production, this would call an API with proper validation
         await new Promise(resolve => setTimeout(resolve, 1000));
 
-        // Check for admin email
-        const isAdminUser = ADMIN_EMAILS.includes(email.toLowerCase());
+        const emailLower = email.toLowerCase();
+
+        // Check for admin email and validate password
+        const isAdminUser = ADMIN_EMAILS.includes(emailLower);
+        if (isAdminUser) {
+          const expectedPassword = ADMIN_ACCOUNTS[emailLower];
+          if (password !== expectedPassword) {
+            throw new Error('Invalid credentials');
+          }
+        }
+
+        // For non-admin users, accept any valid password (simulated)
+        if (!password || password.length < 8) {
+          throw new Error('Invalid credentials');
+        }
 
         const user: User = {
           id: `user-${Date.now()}`,
           email,
-          name: email.split('@')[0],
+          name: isAdminUser ? 'Administrator' : email.split('@')[0],
           createdAt: new Date(),
         };
 

@@ -43,10 +43,10 @@ export function UsageLimitModal({ onClose, onUpgrade }: UsageLimitModalProps) {
           </div>
 
           <h2 className="text-xl font-bold text-white mb-2">
-            Daily Limit Reached
+            AI Analysis Limit Reached
           </h2>
           <p className="text-slate-400 mb-6">
-            You've used all {subscription.features.maxGenerationsPerDay} free ERD generations for today.
+            You've reached the AI analysis limit for your current plan. Upgrade to Pro for more AI-powered features.
           </p>
 
           {/* Usage Stats */}

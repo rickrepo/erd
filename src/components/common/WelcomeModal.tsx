@@ -1,4 +1,4 @@
-import { X, Play, Upload, Sparkles, ArrowRight, Database, Download, MousePointer } from 'lucide-react';
+import { X, Play, Upload, Sparkles, ArrowRight, Database, Download, MousePointer, Crown } from 'lucide-react';
 
 interface WelcomeModalProps {
   onClose: () => void;
@@ -11,22 +11,26 @@ export function WelcomeModal({ onClose, onLoadDemo, onStartFresh }: WelcomeModal
     {
       icon: Database,
       title: 'Parse SQL Instantly',
-      description: 'Paste your queries or CREATE TABLE statements and watch the magic happen',
-    },
-    {
-      icon: Sparkles,
-      title: 'AI-Powered Relationships',
-      description: 'Automatically detect foreign keys from column naming patterns',
+      description: 'Paste queries or CREATE TABLE statements — no sign-up required',
+      free: true,
     },
     {
       icon: MousePointer,
       title: 'Drag & Drop Design',
       description: 'Arrange tables visually with multiple layout algorithms',
+      free: true,
     },
     {
       icon: Download,
       title: 'Export Beautiful ERDs',
       description: 'Download high-quality PNG or SVG images of your schema',
+      free: true,
+    },
+    {
+      icon: Sparkles,
+      title: 'AI-Powered Matching',
+      description: 'Smart relationship detection with semantic analysis',
+      free: false,
     },
   ];
 
@@ -69,15 +73,38 @@ export function WelcomeModal({ onClose, onLoadDemo, onStartFresh }: WelcomeModal
             {features.map((feature, index) => (
               <div
                 key={index}
-                className="p-4 rounded-xl bg-slate-700/50 hover:bg-slate-700 transition-colors group"
+                className={`p-4 rounded-xl transition-colors group ${
+                  feature.free
+                    ? 'bg-slate-700/50 hover:bg-slate-700'
+                    : 'bg-gradient-to-br from-purple-900/30 to-slate-800 border border-purple-700/20 hover:border-purple-600/40'
+                }`}
               >
-                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500/20 to-purple-500/20 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-                  <feature.icon className="w-5 h-5 text-blue-400" />
+                <div className="flex items-start justify-between mb-3">
+                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform ${
+                    feature.free
+                      ? 'bg-gradient-to-br from-blue-500/20 to-purple-500/20'
+                      : 'bg-gradient-to-br from-purple-500/20 to-yellow-500/20'
+                  }`}>
+                    <feature.icon className={`w-5 h-5 ${feature.free ? 'text-blue-400' : 'text-purple-400'}`} />
+                  </div>
+                  {!feature.free && (
+                    <span className="px-1.5 py-0.5 text-[9px] font-bold text-yellow-400 bg-yellow-400/10 rounded-full flex items-center gap-0.5">
+                      <Crown className="w-2.5 h-2.5" />
+                      PRO
+                    </span>
+                  )}
                 </div>
                 <h3 className="font-semibold text-white text-sm mb-1">{feature.title}</h3>
                 <p className="text-xs text-slate-400">{feature.description}</p>
               </div>
             ))}
+          </div>
+
+          {/* Free tier callout */}
+          <div className="mb-4 p-3 bg-green-900/20 border border-green-700/30 rounded-lg text-center">
+            <p className="text-xs text-green-300 font-medium">
+              No sign-up needed — start designing your schema right away
+            </p>
           </div>
 
           {/* Action Buttons */}

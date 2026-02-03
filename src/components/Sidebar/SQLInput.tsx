@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Play, Upload, FileText, AlertCircle, CheckCircle, Crown } from 'lucide-react';
+import { Play, Upload, FileText, AlertCircle, CheckCircle, Sparkles, ArrowRight } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import {
@@ -71,12 +71,7 @@ const SQLInput: React.FC = () => {
     setIsProcessing,
   } = useStore();
 
-  const {
-    incrementUsage,
-    canGenerate,
-    getRemainingGenerations,
-    subscription,
-  } = useAuthStore();
+  const { hasFeature, setShowPremiumModal } = useAuthStore();
 
   const [parseResult, setParseResult] = useState<{
     success: boolean;
@@ -84,8 +79,7 @@ const SQLInput: React.FC = () => {
     details?: string;
   } | null>(null);
 
-  const remainingGenerations = getRemainingGenerations();
-  const isFreeTier = subscription.tier === 'free';
+  const aiEnabled = hasFeature('aiMatchingEnabled');
 
   const handleParse = () => {
     if (!sqlInput.trim()) {
@@ -93,18 +87,6 @@ const SQLInput: React.FC = () => {
         success: false,
         message: 'Please enter SQL queries or CREATE TABLE statements',
       });
-      return;
-    }
-
-    // Check usage limits
-    if (!canGenerate()) {
-      // The incrementUsage function will show the usage limit modal
-      incrementUsage();
-      return;
-    }
-
-    // Increment usage (this will also check and show modal if needed)
-    if (!incrementUsage()) {
       return;
     }
 
@@ -292,21 +274,6 @@ ${inferred.length > 0
         </div>
       )}
 
-      {/* Usage Indicator */}
-      {isFreeTier && (
-        <div className="mt-3 flex items-center justify-between px-1">
-          <div className="flex items-center gap-1.5 text-xs text-slate-400">
-            <Crown className="w-3.5 h-3.5 text-yellow-500" />
-            <span>
-              {remainingGenerations} generation{remainingGenerations !== 1 ? 's' : ''} remaining today
-            </span>
-          </div>
-          {remainingGenerations <= 1 && (
-            <span className="text-xs text-amber-400">Low!</span>
-          )}
-        </div>
-      )}
-
       {/* Parse Button */}
       <button
         onClick={handleParse}
@@ -322,6 +289,18 @@ ${inferred.length > 0
         <Play className="w-4 h-4" />
         {isProcessing ? 'Processing...' : 'Parse SQL & Generate ERD'}
       </button>
+
+      {/* AI Upsell - only show for free users */}
+      {!aiEnabled && (
+        <button
+          onClick={() => setShowPremiumModal(true, 'feature')}
+          className="mt-2 w-full py-2 px-3 rounded-lg bg-gradient-to-r from-purple-900/30 to-blue-900/30 border border-purple-700/30 text-xs text-slate-300 hover:border-purple-500/50 transition-all flex items-center justify-center gap-2 group"
+        >
+          <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+          <span>Unlock AI-powered relationship detection</span>
+          <ArrowRight className="w-3 h-3 text-purple-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+        </button>
+      )}
     </div>
   );
 };

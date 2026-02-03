@@ -142,15 +142,19 @@ export function PremiumModal({ onClose }: PremiumModalProps) {
                 <ul className="space-y-3 mb-6">
                   <li className="flex items-center gap-2 text-slate-300 text-sm">
                     <Check className="w-4 h-4 text-green-500" />
-                    3 ERD generations per day
+                    Unlimited SQL parsing
                   </li>
                   <li className="flex items-center gap-2 text-slate-300 text-sm">
                     <Check className="w-4 h-4 text-green-500" />
-                    Basic SQL parsing
+                    Unlimited ERD generation
                   </li>
                   <li className="flex items-center gap-2 text-slate-300 text-sm">
                     <Check className="w-4 h-4 text-green-500" />
                     Export with watermark
+                  </li>
+                  <li className="flex items-center gap-2 text-slate-300 text-sm">
+                    <Check className="w-4 h-4 text-green-500" />
+                    No sign-up required
                   </li>
                   <li className="flex items-center gap-2 text-slate-500 text-sm">
                     <X className="w-4 h-4 text-slate-600" />
@@ -161,7 +165,7 @@ export function PremiumModal({ onClose }: PremiumModalProps) {
                   disabled
                   className="w-full py-2.5 px-4 rounded-lg bg-slate-700 text-slate-400 font-medium cursor-not-allowed"
                 >
-                  Current Plan
+                  {user ? 'Current Plan' : 'Free Forever'}
                 </button>
               </div>
 
