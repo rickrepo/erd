@@ -19,6 +19,7 @@ function TableNode({ data, selected }: NodeProps) {
   const { table, onColumnClick, isExporting } = nodeData;
   const isSelected = selected || nodeData.isSelected;
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
 
   const hasMany = table.columns.length > MAX_VISIBLE_COLUMNS;
   const visibleColumns = isExpanded || isExporting
@@ -56,10 +57,13 @@ function TableNode({ data, selected }: NodeProps) {
     return type.slice(0, 4).toLowerCase();
   };
 
+  // Show handles when hovered, selected, or exporting
+  const showHandles = isHovered || isSelected || isExporting;
+
   return (
     <div
       className={`
-        bg-slate-900 rounded-lg shadow-2xl transition-all duration-300 min-w-[260px] max-w-[320px]
+        bg-slate-900 rounded-lg shadow-2xl transition-all duration-200 min-w-[260px] max-w-[320px]
         ${isSelected
           ? 'ring-2 ring-blue-500 ring-offset-2 ring-offset-slate-900 scale-[1.02]'
           : 'hover:shadow-3xl'
@@ -72,8 +76,10 @@ function TableNode({ data, selected }: NodeProps) {
           : '0 10px 50px rgba(0,0,0,0.4)',
         border: `2px solid ${isSelected ? table.color : '#334155'}`,
       }}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
     >
-      {/* Header - Professional ERD style */}
+      {/* Header */}
       <div
         className="px-4 py-3 rounded-t-md flex items-center justify-between"
         style={{
@@ -104,7 +110,7 @@ function TableNode({ data, selected }: NodeProps) {
         </div>
       </div>
 
-      {/* Columns - ERD standard display */}
+      {/* Columns */}
       <div
         className={`bg-slate-800/50 ${hasMany && !isExporting ? 'max-h-[280px] overflow-y-auto' : ''}`}
         style={{ scrollbarWidth: 'thin' }}
@@ -124,8 +130,12 @@ function TableNode({ data, selected }: NodeProps) {
               type="target"
               position={Position.Left}
               id={`${column.name}-left`}
-              className="!w-2.5 !h-2.5 !bg-blue-500 !border-2 !border-slate-900 !opacity-100"
-              style={{ left: -6 }}
+              className={`!w-3 !h-3 !border-2 !border-slate-900 transition-all duration-200 ${
+                showHandles
+                  ? '!bg-blue-500 !opacity-100 hover:!bg-blue-400 hover:!scale-125'
+                  : '!bg-blue-500/40 !opacity-0'
+              }`}
+              style={{ left: -7 }}
             />
 
             {/* Column icon */}
@@ -160,8 +170,12 @@ function TableNode({ data, selected }: NodeProps) {
               type="source"
               position={Position.Right}
               id={`${column.name}-right`}
-              className="!w-2.5 !h-2.5 !bg-purple-500 !border-2 !border-slate-900 !opacity-100"
-              style={{ right: -6 }}
+              className={`!w-3 !h-3 !border-2 !border-slate-900 transition-all duration-200 ${
+                showHandles
+                  ? '!bg-purple-500 !opacity-100 hover:!bg-purple-400 hover:!scale-125'
+                  : '!bg-purple-500/40 !opacity-0'
+              }`}
+              style={{ right: -7 }}
             />
           </div>
         ))}
@@ -196,7 +210,7 @@ function TableNode({ data, selected }: NodeProps) {
                 key={c.name}
                 className="px-1.5 py-0.5 bg-blue-500/10 text-blue-400 rounded"
               >
-                → {c.references?.table}
+                -&gt; {c.references?.table}
               </span>
             ))}
             {fkColumns.length > 3 && (
