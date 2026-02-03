@@ -9,6 +9,7 @@ import {
   joinsToRelationships,
   inferRelationships,
 } from '../../utils/sqlParser';
+import { SQLHighlighter } from './SQLHighlighter';
 
 const EXAMPLE_QUERIES = `-- Example: Paste your SQL queries here
 SELECT
@@ -185,7 +186,7 @@ ${inferred.length > 0
   ? `I also inferred **${inferred.length} potential relationships** from column names. Check the "Inferences" tab to review.`
   : ''}
 
-💡 **Tip**: For more accurate column types, paste your CREATE TABLE statements or use the Schema Helper to get schema info from your database.`,
+**Tip**: For more accurate column types, paste your CREATE TABLE statements or use the Schema Helper to get schema info from your database.`,
           });
         } else {
           setParseResult({
@@ -238,14 +239,13 @@ ${inferred.length > 0
         </button>
       </div>
 
-      {/* SQL Editor */}
-      <div className="flex-1 min-h-0">
-        <textarea
+      {/* SQL Editor with Syntax Highlighting */}
+      <div className="flex-1 min-h-0 bg-slate-900 border border-slate-600 rounded-lg overflow-hidden">
+        <SQLHighlighter
           value={sqlInput}
-          onChange={(e) => setSqlInput(e.target.value)}
+          onChange={setSqlInput}
           placeholder="Paste your SQL here..."
-          className="w-full h-full bg-slate-900 border border-slate-600 rounded-lg p-4 text-sm text-slate-200 font-mono resize-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
-          spellCheck={false}
+          className="w-full h-full"
         />
       </div>
 

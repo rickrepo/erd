@@ -10,6 +10,7 @@ import {
   LogOut,
   Shield,
   LogIn,
+  ArrowLeftRight,
 } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { useAuthStore } from '../../store/useAuthStore';
@@ -19,10 +20,11 @@ import SQLInput from './SQLInput';
 import SchemaHelper from './SchemaHelper';
 import TableList from './TableList';
 import InferencePanel from './InferencePanel';
+import RelationshipSummary from './RelationshipSummary';
 import { Branding } from '../common/Branding';
 import { toast } from '../common/Toast';
 
-type TabType = 'sql' | 'schema' | 'tables' | 'infer';
+type TabType = 'sql' | 'schema' | 'tables' | 'relations' | 'infer';
 
 const DIALECT_OPTIONS: { id: SQLDialect; label: string }[] = [
   { id: 'sql', label: 'SQL (Standard)' },
@@ -38,7 +40,7 @@ const Sidebar: React.FC = () => {
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   const userDropdownRef = useRef<HTMLDivElement>(null);
   const dialectDropdownRef = useRef<HTMLDivElement>(null);
-  const { tables, pendingInferences, sqlDialect, setSqlDialect } = useStore();
+  const { tables, relationships, pendingInferences, sqlDialect, setSqlDialect } = useStore();
   const { user, subscription, logout, setShowPremiumModal, setShowAuthPage, isAdmin } = useAuthStore();
 
   // Close dropdowns when clicking outside
@@ -60,6 +62,7 @@ const Sidebar: React.FC = () => {
     { id: 'sql' as TabType, label: 'SQL', icon: Code },
     { id: 'schema' as TabType, label: 'Schema', icon: Database },
     { id: 'tables' as TabType, label: 'Tables', icon: Table2, count: tables.length },
+    { id: 'relations' as TabType, label: 'Relations', icon: ArrowLeftRight, count: relationships.length },
     { id: 'infer' as TabType, label: 'AI', icon: Sparkles, count: pendingInferences.length },
   ];
 
@@ -292,6 +295,7 @@ const Sidebar: React.FC = () => {
         {activeTab === 'sql' && <SQLInput />}
         {activeTab === 'schema' && <SchemaHelper />}
         {activeTab === 'tables' && <TableList />}
+        {activeTab === 'relations' && <RelationshipSummary />}
         {activeTab === 'infer' && <InferencePanel />}
       </div>
     </div>
