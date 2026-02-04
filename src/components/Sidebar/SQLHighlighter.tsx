@@ -26,8 +26,27 @@ function tokenize(sql: string): { type: string; value: string }[] {
   let i = 0;
 
   while (i < sql.length) {
-    // Comments
+    // Single-line comments (--)
     if (sql[i] === '-' && sql[i + 1] === '-') {
+      let end = sql.indexOf('\n', i);
+      if (end === -1) end = sql.length;
+      tokens.push({ type: 'comment', value: sql.slice(i, end) });
+      i = end;
+      continue;
+    }
+
+    // Multi-line comments (/* */)
+    if (sql[i] === '/' && sql[i + 1] === '*') {
+      let end = sql.indexOf('*/', i + 2);
+      if (end === -1) end = sql.length;
+      else end += 2;
+      tokens.push({ type: 'comment', value: sql.slice(i, end) });
+      i = end;
+      continue;
+    }
+
+    // Hash comments (#) — MySQL style
+    if (sql[i] === '#') {
       let end = sql.indexOf('\n', i);
       if (end === -1) end = sql.length;
       tokens.push({ type: 'comment', value: sql.slice(i, end) });

@@ -3,6 +3,75 @@ import type { Table, Column, ParsedQuery, Relationship, InferredRelationship } f
 
 const parser = new Parser();
 
+/**
+ * Strip all SQL comments from input before parsing.
+ * Handles: -- single-line, /* multi-line *​/, and # (MySQL) comments.
+ * Preserves comment-like sequences inside quoted strings.
+ */
+function stripSQLComments(sql: string): string {
+  let result = '';
+  let i = 0;
+
+  while (i < sql.length) {
+    // Single-quoted string — skip through
+    if (sql[i] === "'") {
+      let j = i + 1;
+      while (j < sql.length) {
+        if (sql[j] === "'" && sql[j + 1] === "'") { j += 2; continue; }
+        if (sql[j] === '\\') { j += 2; continue; }
+        if (sql[j] === "'") { j++; break; }
+        j++;
+      }
+      result += sql.slice(i, j);
+      i = j;
+      continue;
+    }
+
+    // Double-quoted identifier — skip through
+    if (sql[i] === '"') {
+      let j = i + 1;
+      while (j < sql.length && sql[j] !== '"') j++;
+      result += sql.slice(i, j + 1);
+      i = j + 1;
+      continue;
+    }
+
+    // Single-line comment (--)
+    if (sql[i] === '-' && sql[i + 1] === '-') {
+      let end = sql.indexOf('\n', i);
+      if (end === -1) break;
+      // Replace comment with whitespace to preserve line structure
+      result += ' ';
+      i = end;
+      continue;
+    }
+
+    // Multi-line comment (/* */)
+    if (sql[i] === '/' && sql[i + 1] === '*') {
+      let end = sql.indexOf('*/', i + 2);
+      if (end === -1) break;
+      // Replace with a space to avoid accidentally joining tokens
+      result += ' ';
+      i = end + 2;
+      continue;
+    }
+
+    // Hash comment (#) — MySQL style
+    if (sql[i] === '#') {
+      let end = sql.indexOf('\n', i);
+      if (end === -1) break;
+      result += ' ';
+      i = end;
+      continue;
+    }
+
+    result += sql[i];
+    i++;
+  }
+
+  return result;
+}
+
 interface ParsedJoin {
   leftTable: string;
   leftColumn: string;
@@ -24,8 +93,10 @@ export function parseSQLQueries(sql: string): ParsedQuery {
   };
 
   try {
+    // Strip comments before parsing to avoid false table/column matches
+    const cleanSql = stripSQLComments(sql);
     // Split by semicolon to handle multiple queries
-    const queries = sql.split(';').filter(q => q.trim());
+    const queries = cleanSql.split(';').filter(q => q.trim());
 
     for (const query of queries) {
       try {
@@ -208,11 +279,14 @@ function removeDuplicateColumns(columns: ExtractedColumn[]): ExtractedColumn[] {
 export function parseCreateTableStatements(sql: string): Table[] {
   const tables: Table[] = [];
 
+  // Strip comments before parsing to avoid false matches inside comments
+  const cleanSql = stripSQLComments(sql);
+
   // Regex to match CREATE TABLE statements
   const createTableRegex = /CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?[`"']?([\w]+)[`"']?\s*\(([\s\S]*?)\)\s*(?:;|$)/gi;
 
   let match;
-  while ((match = createTableRegex.exec(sql)) !== null) {
+  while ((match = createTableRegex.exec(cleanSql)) !== null) {
     const tableName = match[1];
     const columnsStr = match[2];
 
