@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { User, Subscription, UsageStats, SubscriptionFeatures } from '../types';
 import { FREE_TIER_LIMITS, PRO_TIER_FEATURES, ENTERPRISE_TIER_FEATURES } from '../types';
+import { switchUserStorage } from './useStore';
 
 // Admin accounts - in production, this would be validated server-side with hashed passwords
 const ADMIN_ACCOUNTS: Record<string, string> = {
@@ -122,6 +123,8 @@ export const useAuthStore = create<AuthStore>()(
           : initialSubscription;
 
         set({ user, subscription, showAuthPage: false });
+        // Load this user's saved schema data from their scoped storage
+        setTimeout(() => switchUserStorage(), 0);
         return true;
       },
 
@@ -137,14 +140,20 @@ export const useAuthStore = create<AuthStore>()(
         };
 
         set({ user, showAuthPage: false });
+        // Load this user's saved schema data from their scoped storage
+        setTimeout(() => switchUserStorage(), 0);
         return true;
       },
 
-      logout: () => set({
-        user: null,
-        subscription: initialSubscription,
-        showAuthPage: false,
-      }),
+      logout: () => {
+        set({
+          user: null,
+          subscription: initialSubscription,
+          showAuthPage: false,
+        });
+        // Switch to anonymous storage after logout
+        setTimeout(() => switchUserStorage(), 0);
+      },
 
       isAuthenticated: () => {
         const { user } = get();

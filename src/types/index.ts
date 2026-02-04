@@ -75,6 +75,15 @@ export interface InferredRelationship {
   reason: string;
 }
 
+export interface SavedSchema {
+  id: string;
+  name: string;
+  tables: Table[];
+  relationships: Relationship[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 export type ViewMode = 'design' | 'query' | 'schema';
 
 export interface AppState {

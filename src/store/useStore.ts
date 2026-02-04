@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import type { Table, Relationship, ChatMessage, ViewMode, InferredRelationship, Column } from '../types';
+import { persist } from 'zustand/middleware';
+import type { Table, Relationship, ChatMessage, ViewMode, InferredRelationship, Column, SavedSchema } from '../types';
 
 export type SQLDialect = 'sql' | 'mysql' | 'postgres' | 'sqlite' | 'sqlserver';
 
@@ -18,6 +19,7 @@ interface ERDStore {
   sqlDialect: SQLDialect;
   showWelcome: boolean;
   isDemoMode: boolean;
+  savedSchemas: SavedSchema[];
 
   // Table Actions
   addTable: (table: Table) => void;
@@ -62,6 +64,12 @@ interface ERDStore {
   setShowWelcome: (show: boolean) => void;
   loadDemo: (tables: Table[], relationships: Relationship[], sql: string) => void;
 
+  // Saved Schema Actions
+  saveCurrentSchema: (name: string) => string;
+  loadSavedSchema: (id: string) => void;
+  deleteSavedSchema: (id: string) => void;
+  renameSavedSchema: (id: string, name: string) => void;
+
   // Reset
   reset: () => void;
 }
@@ -101,9 +109,65 @@ const initialState = {
   sqlDialect: 'sql' as SQLDialect,
   showWelcome: true,
   isDemoMode: false,
+  savedSchemas: [] as SavedSchema[],
 };
 
-export const useStore = create<ERDStore>((set, get) => ({
+// Helper to get the user-scoped storage key
+const getStorageKey = (): string => {
+  try {
+    const authData = localStorage.getItem('schemaflow-auth');
+    if (authData) {
+      const parsed = JSON.parse(authData);
+      if (parsed?.state?.user?.id) {
+        return `schemaflow-data-${parsed.state.user.id}`;
+      }
+    }
+  } catch {
+    // Fall through to default
+  }
+  return 'schemaflow-data-anonymous';
+};
+
+/**
+ * Call this when a user logs in or out to reload data from the correct
+ * user-scoped localStorage key. Clears transient state (raw SQL, etc.)
+ * and loads the user's persisted tables/relationships/savedSchemas.
+ */
+export const switchUserStorage = () => {
+  const key = getStorageKey();
+  try {
+    const raw = localStorage.getItem(key);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      const data = parsed?.state;
+      if (data) {
+        useStore.setState({
+          tables: data.tables ?? [],
+          relationships: data.relationships ?? [],
+          savedSchemas: data.savedSchemas ?? [],
+          sqlDialect: data.sqlDialect ?? 'sql',
+          sqlInput: '',
+          schemaInput: '',
+        });
+        return;
+      }
+    }
+  } catch {
+    // Fall through to defaults
+  }
+  // No saved data for this user — start clean
+  useStore.setState({
+    tables: [],
+    relationships: [],
+    savedSchemas: [],
+    sqlInput: '',
+    schemaInput: '',
+  });
+};
+
+export const useStore = create<ERDStore>()(
+  persist(
+    (set, get) => ({
   ...initialState,
 
   // Table Actions
@@ -276,10 +340,98 @@ Try asking me questions about the schema!`,
     });
   },
 
+  // Saved Schema Actions
+  saveCurrentSchema: (name) => {
+    const { tables, relationships, savedSchemas } = get();
+    const now = new Date().toISOString();
+    const id = `schema-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+
+    const schema: SavedSchema = {
+      id,
+      name,
+      tables,
+      relationships,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    set({ savedSchemas: [...savedSchemas, schema] });
+    return id;
+  },
+
+  loadSavedSchema: (id) => {
+    const { savedSchemas, addChatMessage } = get();
+    const schema = savedSchemas.find(s => s.id === id);
+    if (!schema) return;
+
+    set({
+      tables: schema.tables,
+      relationships: schema.relationships,
+      sqlInput: '',
+      schemaInput: '',
+    });
+
+    addChatMessage({
+      role: 'assistant',
+      content: `Loaded saved schema **"${schema.name}"** with ${schema.tables.length} table(s) and ${schema.relationships.length} relationship(s).`,
+    });
+  },
+
+  deleteSavedSchema: (id) => set((state) => ({
+    savedSchemas: state.savedSchemas.filter(s => s.id !== id),
+  })),
+
+  renameSavedSchema: (id, name) => set((state) => ({
+    savedSchemas: state.savedSchemas.map(s =>
+      s.id === id ? { ...s, name, updatedAt: new Date().toISOString() } : s
+    ),
+  })),
+
   // Reset
   reset: () => set({
     ...initialState,
+    savedSchemas: get().savedSchemas,
     showWelcome: false,
     chatMessages: [createWelcomeMessage()],
   }),
-}));
+    }),
+    {
+      name: 'schemaflow-data',
+      // Only persist structured schema data — never raw SQL or transient UI state
+      partialize: (state) => ({
+        tables: state.tables,
+        relationships: state.relationships,
+        savedSchemas: state.savedSchemas,
+        sqlDialect: state.sqlDialect,
+      }),
+      storage: {
+        getItem: (_name) => {
+          const key = getStorageKey();
+          const raw = localStorage.getItem(key);
+          if (!raw) return null;
+          // Return in the format zustand persist expects
+          // but we store under a dynamic key
+          return JSON.parse(raw);
+        },
+        setItem: (_name, value) => {
+          const key = getStorageKey();
+          localStorage.setItem(key, JSON.stringify(value));
+        },
+        removeItem: (_name) => {
+          const key = getStorageKey();
+          localStorage.removeItem(key);
+        },
+      },
+      merge: (persistedState, currentState) => {
+        const persisted = persistedState as Partial<ERDStore> | undefined;
+        return {
+          ...currentState,
+          tables: persisted?.tables ?? currentState.tables,
+          relationships: persisted?.relationships ?? currentState.relationships,
+          savedSchemas: persisted?.savedSchemas ?? currentState.savedSchemas,
+          sqlDialect: persisted?.sqlDialect ?? currentState.sqlDialect,
+        };
+      },
+    }
+  )
+);

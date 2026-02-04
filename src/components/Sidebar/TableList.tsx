@@ -13,6 +13,7 @@ import {
 import { useStore } from '../../store/useStore';
 import type { Table, Column } from '../../types';
 import { getTableColor } from '../../utils/sqlParser';
+import SavedSchemas from './SavedSchemas';
 
 const TableList: React.FC = () => {
   const {
@@ -120,8 +121,11 @@ const TableList: React.FC = () => {
         </div>
       )}
 
+      {/* Saved Schemas */}
+      <SavedSchemas />
+
       {/* Table List */}
-      <div className="flex-1 space-y-2 overflow-auto">
+      <div className="flex-1 space-y-2 overflow-auto mt-3">
         {tables.length === 0 ? (
           <div className="text-center py-8">
             <div className="w-16 h-16 rounded-full bg-slate-700 flex items-center justify-center mx-auto mb-3">
