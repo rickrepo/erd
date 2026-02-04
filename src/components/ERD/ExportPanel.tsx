@@ -158,7 +158,7 @@ export function ExportPanel({ onClose }: ExportPanelProps) {
   }, [format, quality, includeBranding, transparentBg, getNodes, onClose]);
 
   return (
-    <div className="absolute top-4 right-4 w-80 bg-slate-800 rounded-xl shadow-2xl border border-slate-700 overflow-hidden z-50 animate-slideIn">
+    <div className="absolute top-4 left-4 right-4 sm:left-auto sm:w-80 bg-slate-800 rounded-xl shadow-2xl border border-slate-700 overflow-hidden z-50 animate-slideIn">
       {/* Header */}
       <div className="px-4 py-3 border-b border-slate-700 flex items-center justify-between">
         <div className="flex items-center gap-2">

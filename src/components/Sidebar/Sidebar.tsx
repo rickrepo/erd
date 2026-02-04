@@ -114,7 +114,7 @@ const Sidebar: React.FC = () => {
   };
 
   return (
-    <div className="w-96 h-full bg-slate-800 border-r border-slate-700 flex flex-col">
+    <div className="w-full lg:w-96 h-full bg-slate-800 lg:border-r border-slate-700 flex flex-col">
       {/* Header with Branding */}
       <div className="p-4 border-b border-slate-700">
         <div className="flex items-center justify-between">

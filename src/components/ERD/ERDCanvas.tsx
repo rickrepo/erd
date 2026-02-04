@@ -624,18 +624,18 @@ const ERDCanvas: React.FC = () => {
             return data?.table?.color || '#3b82f6';
           }}
           maskColor="rgba(15, 23, 42, 0.9)"
-          className="!bg-slate-800/90 !border-slate-700 !rounded-xl !shadow-xl"
+          className="!bg-slate-800/90 !border-slate-700 !rounded-xl !shadow-xl !hidden lg:!block"
           pannable
           zoomable
         />
 
         {/* Top Toolbar */}
-        <Panel position="top-left" className="flex gap-2">
+        <Panel position="top-left" className="flex flex-wrap gap-1.5 lg:gap-2 max-w-[calc(100vw-1rem)]">
           {/* Layout Controls */}
-          <div className="bg-slate-800/90 backdrop-blur-sm rounded-xl p-1.5 flex gap-1 shadow-xl border border-slate-700">
+          <div className="bg-slate-800/90 backdrop-blur-sm rounded-xl p-1 lg:p-1.5 flex gap-0.5 lg:gap-1 shadow-xl border border-slate-700">
             <button
               onClick={() => handleLayout('grid')}
-              className={`p-2.5 rounded-lg transition-all ${
+              className={`p-2 lg:p-2.5 rounded-lg transition-all ${
                 layoutType === 'grid'
                   ? 'bg-blue-600 text-white shadow-lg'
                   : 'hover:bg-slate-700 text-slate-400 hover:text-white'
@@ -646,7 +646,7 @@ const ERDCanvas: React.FC = () => {
             </button>
             <button
               onClick={() => handleLayout('force')}
-              className={`p-2.5 rounded-lg transition-all ${
+              className={`p-2 lg:p-2.5 rounded-lg transition-all ${
                 layoutType === 'force'
                   ? 'bg-blue-600 text-white shadow-lg'
                   : 'hover:bg-slate-700 text-slate-400 hover:text-white'
@@ -657,7 +657,7 @@ const ERDCanvas: React.FC = () => {
             </button>
             <button
               onClick={() => handleLayout('hierarchical')}
-              className={`p-2.5 rounded-lg transition-all ${
+              className={`p-2 lg:p-2.5 rounded-lg transition-all ${
                 layoutType === 'hierarchical'
                   ? 'bg-blue-600 text-white shadow-lg'
                   : 'hover:bg-slate-700 text-slate-400 hover:text-white'
@@ -672,7 +672,7 @@ const ERDCanvas: React.FC = () => {
             {/* Undo/Redo */}
             <button
               onClick={handleUndo}
-              className="p-2.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+              className="p-2 lg:p-2.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-all disabled:opacity-30 disabled:cursor-not-allowed"
               title="Undo (Ctrl+Z)"
               disabled={historyRef.current.length === 0}
             >
@@ -680,7 +680,7 @@ const ERDCanvas: React.FC = () => {
             </button>
             <button
               onClick={handleRedo}
-              className="p-2.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+              className="p-2 lg:p-2.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-all disabled:opacity-30 disabled:cursor-not-allowed"
               title="Redo (Ctrl+Shift+Z)"
               disabled={futureRef.current.length === 0}
             >
@@ -689,24 +689,24 @@ const ERDCanvas: React.FC = () => {
           </div>
 
           {/* Zoom Controls */}
-          <div className="bg-slate-800/90 backdrop-blur-sm rounded-xl p-1.5 flex gap-1 shadow-xl border border-slate-700">
+          <div className="bg-slate-800/90 backdrop-blur-sm rounded-xl p-1 lg:p-1.5 flex gap-0.5 lg:gap-1 shadow-xl border border-slate-700">
             <button
               onClick={() => zoomIn({ duration: 200 })}
-              className="p-2.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-all"
+              className="p-2 lg:p-2.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-all"
               title="Zoom In"
             >
               <ZoomIn className="w-4 h-4" />
             </button>
             <button
               onClick={() => zoomOut({ duration: 200 })}
-              className="p-2.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-all"
+              className="p-2 lg:p-2.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-all"
               title="Zoom Out"
             >
               <ZoomOut className="w-4 h-4" />
             </button>
             <button
               onClick={() => fitView({ padding: 0.15, duration: 300 })}
-              className="p-2.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-all"
+              className="p-2 lg:p-2.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-all"
               title="Fit View"
             >
               <Maximize2 className="w-4 h-4" />
@@ -716,27 +716,27 @@ const ERDCanvas: React.FC = () => {
           {/* Add Table Button */}
           <button
             onClick={() => handleQuickAddTable({ x: 400, y: 200 })}
-            className="bg-slate-800/90 backdrop-blur-sm rounded-xl p-2.5 shadow-xl border border-slate-700 hover:bg-slate-700 text-slate-400 hover:text-white transition-all flex items-center gap-2 text-sm font-medium"
+            className="bg-slate-800/90 backdrop-blur-sm rounded-xl p-2 lg:p-2.5 shadow-xl border border-slate-700 hover:bg-slate-700 text-slate-400 hover:text-white transition-all flex items-center gap-1.5 lg:gap-2 text-sm font-medium"
             title="Add Table"
           >
             <Plus className="w-4 h-4" />
-            <span>Add Table</span>
+            <span className="hidden sm:inline">Add Table</span>
           </button>
 
           {/* Export Button */}
           {tables.length > 0 && (
             <button
               onClick={() => setShowExport(true)}
-              className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 rounded-xl p-2.5 flex items-center gap-2 shadow-xl text-white font-medium text-sm transition-all hover:scale-105"
+              className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 rounded-xl p-2 lg:p-2.5 flex items-center gap-1.5 lg:gap-2 shadow-xl text-white font-medium text-sm transition-all hover:scale-105"
             >
               <Download className="w-4 h-4" />
-              <span>Export</span>
+              <span className="hidden sm:inline">Export</span>
             </button>
           )}
         </Panel>
 
         {/* Stats Panel */}
-        <Panel position="top-right">
+        <Panel position="top-right" className="hidden sm:block">
           <div className="bg-slate-800/90 backdrop-blur-sm rounded-xl px-4 py-2.5 shadow-xl border border-slate-700 flex items-center gap-4">
             <div className="flex items-center gap-2">
               <Database className="w-4 h-4 text-blue-400" />
@@ -752,8 +752,8 @@ const ERDCanvas: React.FC = () => {
           </div>
         </Panel>
 
-        {/* Keyboard shortcuts hint */}
-        <Panel position="bottom-right">
+        {/* Keyboard shortcuts hint — desktop only */}
+        <Panel position="bottom-right" className="hidden lg:block">
           <div className="bg-slate-800/70 backdrop-blur-sm rounded-xl px-3 py-2 shadow-xl border border-slate-700/50 text-[10px] text-slate-500 space-y-0.5">
             <div><kbd className="text-slate-400">Right-click</kbd> for options</div>
             <div><kbd className="text-slate-400">Del</kbd> remove selected</div>
@@ -762,8 +762,8 @@ const ERDCanvas: React.FC = () => {
           </div>
         </Panel>
 
-        {/* Branding */}
-        <Panel position="bottom-left">
+        {/* Branding — desktop only */}
+        <Panel position="bottom-left" className="hidden lg:block">
           <div className="bg-slate-800/80 backdrop-blur-sm rounded-xl p-2 shadow-xl border border-slate-700/50">
             <Branding size="sm" />
           </div>
@@ -771,17 +771,17 @@ const ERDCanvas: React.FC = () => {
 
         {/* Empty State */}
         {tables.length === 0 && (
-          <Panel position="top-center" className="!top-1/2 !-translate-y-1/2 !left-1/2 !-translate-x-1/2">
-            <div className="text-center max-w-md animate-fadeIn">
-              <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-blue-600/20 to-purple-600/20 flex items-center justify-center mx-auto mb-6 border border-slate-700">
-                <Database className="w-12 h-12 text-blue-400" />
+          <Panel position="top-center" className="!top-1/2 !-translate-y-1/2 !left-1/2 !-translate-x-1/2 !w-[calc(100%-2rem)] sm:!w-auto">
+            <div className="text-center max-w-md mx-auto animate-fadeIn px-4">
+              <div className="w-16 h-16 lg:w-24 lg:h-24 rounded-2xl bg-gradient-to-br from-blue-600/20 to-purple-600/20 flex items-center justify-center mx-auto mb-4 lg:mb-6 border border-slate-700">
+                <Database className="w-8 h-8 lg:w-12 lg:h-12 text-blue-400" />
               </div>
-              <h3 className="text-2xl font-bold text-white mb-3">Ready to Design</h3>
-              <p className="text-slate-400 mb-6 leading-relaxed">
-                Paste SQL queries or CREATE TABLE statements in the sidebar,
-                or right-click here to add tables directly.
+              <h3 className="text-xl lg:text-2xl font-bold text-white mb-2 lg:mb-3">Ready to Design</h3>
+              <p className="text-sm lg:text-base text-slate-400 mb-4 lg:mb-6 leading-relaxed">
+                <span className="hidden sm:inline">Paste SQL queries or CREATE TABLE statements in the sidebar, or right-click here to add tables directly.</span>
+                <span className="sm:hidden">Switch to the SQL tab to paste your schema, or tap below to add a table.</span>
               </p>
-              <div className="flex flex-wrap items-center justify-center gap-2 text-sm text-slate-500">
+              <div className="hidden sm:flex flex-wrap items-center justify-center gap-2 text-sm text-slate-500">
                 <span className="px-2 py-1 bg-slate-800 rounded-lg border border-slate-700">Drag</span>
                 <span>to move</span>
                 <span className="px-2 py-1 bg-slate-800 rounded-lg border border-slate-700">Connect</span>
@@ -791,7 +791,7 @@ const ERDCanvas: React.FC = () => {
               </div>
               <button
                 onClick={() => handleQuickAddTable({ x: window.innerWidth / 2, y: window.innerHeight / 2 })}
-                className="mt-6 px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-medium flex items-center gap-2 mx-auto transition-all"
+                className="mt-4 lg:mt-6 px-5 py-2.5 lg:px-6 lg:py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-medium flex items-center gap-2 mx-auto transition-all text-sm lg:text-base"
               >
                 <Plus className="w-4 h-4" />
                 Add Your First Table

@@ -208,3 +208,36 @@ input:focus, textarea:focus, select:focus {
   border-color: var(--accent-primary);
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
 }
+
+/* Mobile safe area for bottom nav */
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+/* Touch-friendly tap targets on mobile */
+@media (max-width: 1023px) {
+  .react-flow__handle {
+    width: 12px !important;
+    height: 12px !important;
+  }
+
+  .react-flow__node {
+    cursor: default;
+  }
+
+  .react-flow__controls {
+    display: none;
+  }
+
+  .react-flow__attribution {
+    display: none;
+  }
+}
+
+/* Prevent overscroll/pull-to-refresh on mobile */
+@media (max-width: 1023px) {
+  html, body {
+    overscroll-behavior: none;
+    -webkit-overflow-scrolling: touch;
+  }
+}

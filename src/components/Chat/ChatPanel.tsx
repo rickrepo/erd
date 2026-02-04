@@ -67,7 +67,7 @@ const ChatPanel: React.FC = () => {
     return (
       <button
         onClick={() => setIsMinimized(false)}
-        className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-br from-blue-600 to-purple-600 rounded-full shadow-lg shadow-purple-500/30 flex items-center justify-center hover:scale-110 transition-transform z-50"
+        className="hidden lg:flex fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-br from-blue-600 to-purple-600 rounded-full shadow-lg shadow-purple-500/30 items-center justify-center hover:scale-110 transition-transform z-50"
       >
         <Bot className="w-6 h-6 text-white" />
       </button>
@@ -75,7 +75,7 @@ const ChatPanel: React.FC = () => {
   }
 
   return (
-    <div className="w-96 h-full bg-slate-800 border-l border-slate-700 flex flex-col">
+    <div className="w-full lg:w-96 h-full bg-slate-800 lg:border-l border-slate-700 flex flex-col">
       {/* Header */}
       <div className="p-4 border-b border-slate-700 flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -97,7 +97,7 @@ const ChatPanel: React.FC = () => {
           </button>
           <button
             onClick={() => setIsMinimized(true)}
-            className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
+            className="hidden lg:block p-2 hover:bg-slate-700 rounded-lg transition-colors"
             title="Minimize"
           >
             <Minimize2 className="w-4 h-4 text-slate-400" />
