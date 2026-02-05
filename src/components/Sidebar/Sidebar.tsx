@@ -3,11 +3,6 @@ import {
   Code,
   ChevronDown,
   ChevronUp,
-  Crown,
-  User,
-  LogOut,
-  Shield,
-  LogIn,
   Link,
   ArrowRight,
   Eye,
@@ -18,9 +13,7 @@ import {
 } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { useAuthStore } from '../../store/useAuthStore';
-import { useAdminStore } from '../../store/useAdminStore';
 import type { SQLDialect } from '../../store/useStore';
-import { Branding } from '../common/Branding';
 import { toast } from '../common/Toast';
 import { parseCreateTableStatements, inferRelationships, joinsToRelationships, parseSQLQueries, createTablesFromQuery } from '../../utils/sqlParser';
 
@@ -89,12 +82,9 @@ const Sidebar: React.FC<SidebarProps> = ({
   const [sqlExpanded, setSqlExpanded] = useState(tables.length === 0);
   const [sqlInput, setSqlInput] = useState('');
   const [showDialectDropdown, setShowDialectDropdown] = useState(false);
-  const [showUserDropdown, setShowUserDropdown] = useState(false);
-  const userDropdownRef = useRef<HTMLDivElement>(null);
   const dialectDropdownRef = useRef<HTMLDivElement>(null);
 
-  const { user, subscription, logout, setShowPremiumModal, setShowAuthPage, isAdmin } = useAuthStore();
-  const { setShowAdminPanel, loadDemoData } = useAdminStore();
+  const { subscription, setShowPremiumModal } = useAuthStore();
 
   // Expand SQL input when tables are cleared
   useEffect(() => {
@@ -106,9 +96,6 @@ const Sidebar: React.FC<SidebarProps> = ({
   // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (userDropdownRef.current && !userDropdownRef.current.contains(e.target as Node)) {
-        setShowUserDropdown(false);
-      }
       if (dialectDropdownRef.current && !dialectDropdownRef.current.contains(e.target as Node)) {
         setShowDialectDropdown(false);
       }
@@ -233,122 +220,11 @@ const Sidebar: React.FC<SidebarProps> = ({
     }
   };
 
-  const handleOpenAdmin = () => {
-    if (!isAdmin()) {
-      toast.error('Access Denied', 'Admin access requires login with admin credentials');
-      setShowUserDropdown(false);
-      return;
-    }
-    loadDemoData();
-    setShowAdminPanel(true);
-    setShowUserDropdown(false);
-  };
-
-  const handleLogout = () => {
-    logout();
-    setShowUserDropdown(false);
-    toast.info('Signed out', 'You have been signed out successfully');
-  };
-
-  const getTierBadge = () => {
-    switch (subscription.tier) {
-      case 'pro':
-        return <span className="px-1.5 py-0.5 bg-gradient-to-r from-blue-500 to-purple-500 text-white text-[9px] font-bold rounded-full">PRO</span>;
-      case 'enterprise':
-        return <span className="px-1.5 py-0.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-[9px] font-bold rounded-full">ENT</span>;
-      default:
-        return null;
-    }
-  };
-
   const visibleCount = activeRelationships.size;
   const totalCount = relationships.length;
 
   return (
     <div className="w-full lg:w-80 h-full bg-slate-800 lg:border-r border-slate-700 flex flex-col">
-      {/* Header */}
-      <div className="p-3 border-b border-slate-700">
-        <div className="flex items-center justify-between">
-          <Branding size="sm" />
-
-          <div className="flex items-center gap-1.5">
-            {/* User Menu */}
-            <div className="relative" ref={userDropdownRef}>
-              <button
-                onClick={() => setShowUserDropdown(!showUserDropdown)}
-                className="flex items-center gap-1 p-1 hover:bg-slate-700 rounded-lg transition-colors"
-              >
-                {user ? (
-                  <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-[10px] font-medium">
-                    {user.name?.charAt(0).toUpperCase() || user.email.charAt(0).toUpperCase()}
-                  </div>
-                ) : (
-                  <div className="w-6 h-6 rounded-full bg-slate-700 flex items-center justify-center">
-                    <User className="w-3 h-3 text-slate-400" />
-                  </div>
-                )}
-                {getTierBadge()}
-              </button>
-
-              {showUserDropdown && (
-                <div className="absolute top-full right-0 mt-1 w-48 bg-slate-700 rounded-lg shadow-xl border border-slate-600 z-50 overflow-hidden animate-slideIn">
-                  {user ? (
-                    <>
-                      <div className="p-2.5 border-b border-slate-600">
-                        <p className="text-xs font-medium text-white truncate">{user.name || user.email.split('@')[0]}</p>
-                        <p className="text-[10px] text-slate-400 truncate">{user.email}</p>
-                      </div>
-                      {subscription.tier === 'free' && (
-                        <button
-                          onClick={() => { setShowUserDropdown(false); setShowPremiumModal(true, 'upgrade'); }}
-                          className="w-full px-3 py-2 text-xs text-left text-yellow-400 hover:bg-slate-600 transition-colors flex items-center gap-2"
-                        >
-                          <Crown className="w-3.5 h-3.5" />
-                          Upgrade to Pro
-                        </button>
-                      )}
-                      {isAdmin() && (
-                        <button
-                          onClick={handleOpenAdmin}
-                          className="w-full px-3 py-2 text-xs text-left text-red-400 hover:bg-slate-600 transition-colors flex items-center gap-2"
-                        >
-                          <Shield className="w-3.5 h-3.5" />
-                          Admin Panel
-                        </button>
-                      )}
-                      <button
-                        onClick={handleLogout}
-                        className="w-full px-3 py-2 text-xs text-left text-slate-300 hover:bg-slate-600 transition-colors flex items-center gap-2"
-                      >
-                        <LogOut className="w-3.5 h-3.5" />
-                        Sign Out
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <button
-                        onClick={() => { setShowUserDropdown(false); setShowAuthPage(true); }}
-                        className="w-full px-3 py-2 text-xs text-left text-white hover:bg-slate-600 transition-colors flex items-center gap-2"
-                      >
-                        <LogIn className="w-3.5 h-3.5" />
-                        Sign In
-                      </button>
-                      <button
-                        onClick={() => { setShowUserDropdown(false); setShowPremiumModal(true, 'upgrade'); }}
-                        className="w-full px-3 py-2 text-xs text-left text-yellow-400 hover:bg-slate-600 transition-colors flex items-center gap-2 border-t border-slate-600"
-                      >
-                        <Crown className="w-3.5 h-3.5" />
-                        Get Pro
-                      </button>
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* SQL Input Section */}
       <div className={`border-b border-slate-700 ${tables.length === 0 ? 'bg-slate-700/30' : ''}`}>
         <button

@@ -2,6 +2,7 @@ import { useEffect, useCallback, useState } from 'react';
 import { ReactFlowProvider, useReactFlow } from '@xyflow/react';
 import Sidebar from './components/Sidebar/Sidebar';
 import ERDCanvas from './components/ERD/ERDCanvas';
+import { Header } from './components/common/Header';
 import { WelcomeModal } from './components/common/WelcomeModal';
 import { PremiumModal } from './components/common/PremiumModal';
 import { UsageLimitModal } from './components/common/UsageLimitModal';
@@ -12,7 +13,7 @@ import { useStore } from './store/useStore';
 import { useAuthStore } from './store/useAuthStore';
 import { useAdminStore } from './store/useAdminStore';
 import { DEMO_TABLES, DEMO_RELATIONSHIPS, DEMO_SQL_QUERIES } from './utils/demoData';
-import { Code, GitBranch, Link } from 'lucide-react';
+import { GitBranch, Link, Code } from 'lucide-react';
 
 type MobilePanel = 'sidebar' | 'canvas';
 
@@ -204,42 +205,23 @@ const AppContent: React.FC = () => {
   ];
 
   return (
-    <div className="w-full h-screen flex flex-col lg:flex-row bg-slate-900 overflow-hidden">
-      {/* Desktop layout */}
-      {!isMobile && (
-        <>
-          <Sidebar
-            activeRelationships={activeRelationships}
-            onToggleRelationship={handleToggleRelationship}
-            onShowAll={handleShowAll}
-            onHideAll={handleHideAll}
-            onAnimateChain={handleAnimateChain}
-          />
-          <div className="flex-1 relative">
-            <ERDCanvas
-              activeRelationships={activeRelationships}
-              setActiveRelationships={setActiveRelationships}
-              animatingRelationship={animatingRelationship}
-              setAnimatingRelationship={setAnimatingRelationship}
-            />
-          </div>
-        </>
-      )}
+    <div className="w-full h-screen flex flex-col bg-slate-900 overflow-hidden">
+      {/* Top Header Bar */}
+      <Header />
 
-      {/* Mobile layout */}
-      {isMobile && (
-        <>
-          <div className="flex-1 overflow-hidden relative">
-            <div className={mobilePanel === 'sidebar' ? 'h-full' : 'hidden'}>
-              <Sidebar
-                activeRelationships={activeRelationships}
-                onToggleRelationship={handleToggleRelationship}
-                onShowAll={handleShowAll}
-                onHideAll={handleHideAll}
-                onAnimateChain={handleAnimateChain}
-              />
-            </div>
-            <div className={mobilePanel === 'canvas' ? 'h-full' : 'hidden'}>
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
+        {/* Desktop layout */}
+        {!isMobile && (
+          <>
+            <Sidebar
+              activeRelationships={activeRelationships}
+              onToggleRelationship={handleToggleRelationship}
+              onShowAll={handleShowAll}
+              onHideAll={handleHideAll}
+              onAnimateChain={handleAnimateChain}
+            />
+            <div className="flex-1 relative">
               <ERDCanvas
                 activeRelationships={activeRelationships}
                 setActiveRelationships={setActiveRelationships}
@@ -247,37 +229,62 @@ const AppContent: React.FC = () => {
                 setAnimatingRelationship={setAnimatingRelationship}
               />
             </div>
-          </div>
+          </>
+        )}
 
-          {/* Mobile bottom navigation */}
-          <div className="flex-shrink-0 bg-slate-800 border-t border-slate-700 safe-area-bottom">
-            <div className="flex">
-              {mobileTabs.map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setMobilePanel(tab.id)}
-                  className={`flex-1 flex flex-col items-center gap-0.5 py-2.5 px-2 transition-colors relative ${
-                    mobilePanel === tab.id
-                      ? 'text-purple-400'
-                      : 'text-slate-500 active:text-slate-300'
-                  }`}
-                >
-                  <tab.icon className="w-5 h-5" />
-                  <span className="text-[10px] font-medium">{tab.label}</span>
-                  {tab.badge !== undefined && tab.badge > 0 && (
-                    <span className="absolute top-1.5 right-1/2 translate-x-4 px-1 min-w-[16px] h-4 text-[9px] font-bold bg-purple-500 text-white rounded-full flex items-center justify-center">
-                      {tab.badge}
-                    </span>
-                  )}
-                  {mobilePanel === tab.id && (
-                    <div className="absolute top-0 left-4 right-4 h-0.5 bg-purple-500 rounded-full" />
-                  )}
-                </button>
-              ))}
+        {/* Mobile layout */}
+        {isMobile && (
+          <>
+            <div className="flex-1 overflow-hidden relative">
+              <div className={mobilePanel === 'sidebar' ? 'h-full' : 'hidden'}>
+                <Sidebar
+                  activeRelationships={activeRelationships}
+                  onToggleRelationship={handleToggleRelationship}
+                  onShowAll={handleShowAll}
+                  onHideAll={handleHideAll}
+                  onAnimateChain={handleAnimateChain}
+                />
+              </div>
+              <div className={mobilePanel === 'canvas' ? 'h-full' : 'hidden'}>
+                <ERDCanvas
+                  activeRelationships={activeRelationships}
+                  setActiveRelationships={setActiveRelationships}
+                  animatingRelationship={animatingRelationship}
+                  setAnimatingRelationship={setAnimatingRelationship}
+                />
+              </div>
             </div>
-          </div>
-        </>
-      )}
+
+            {/* Mobile bottom navigation */}
+            <div className="flex-shrink-0 bg-slate-800 border-t border-slate-700 safe-area-bottom">
+              <div className="flex">
+                {mobileTabs.map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setMobilePanel(tab.id)}
+                    className={`flex-1 flex flex-col items-center gap-0.5 py-2.5 px-2 transition-colors relative ${
+                      mobilePanel === tab.id
+                        ? 'text-purple-400'
+                        : 'text-slate-500 active:text-slate-300'
+                    }`}
+                  >
+                    <tab.icon className="w-5 h-5" />
+                    <span className="text-[10px] font-medium">{tab.label}</span>
+                    {tab.badge !== undefined && tab.badge > 0 && (
+                      <span className="absolute top-1.5 right-1/2 translate-x-4 px-1 min-w-[16px] h-4 text-[9px] font-bold bg-purple-500 text-white rounded-full flex items-center justify-center">
+                        {tab.badge}
+                      </span>
+                    )}
+                    {mobilePanel === tab.id && (
+                      <div className="absolute top-0 left-4 right-4 h-0.5 bg-purple-500 rounded-full" />
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
+      </div>
 
       {/* Welcome Modal */}
       {showWelcome && (

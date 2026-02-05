@@ -133,19 +133,15 @@ function extractFromAST(ast: any, result: ParsedQuery) {
       if (from.table) {
         result.tables.push(from.table);
       }
-      // Handle joined tables
-      if (from.join) {
-        for (const join of from.join) {
-          if (join.table) {
-            result.tables.push(join.table);
-          }
-          // Extract join conditions
-          if (join.on) {
-            const joinInfo = extractJoinCondition(join.on);
-            if (joinInfo) {
-              result.joins.push(joinInfo);
-            }
-          }
+
+      // In node-sql-parser, JOINed tables have:
+      // - from.join = join type string (e.g., "INNER JOIN")
+      // - from.on = the ON condition
+      // Check if this FROM entry is a joined table with an ON condition
+      if (from.on) {
+        const joinInfo = extractJoinCondition(from.on);
+        if (joinInfo) {
+          result.joins.push(joinInfo);
         }
       }
     }

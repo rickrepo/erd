@@ -72,7 +72,7 @@ export function gridLayout(
   });
 }
 
-// Force-directed layout simulation with dynamic node heights
+// Force-directed layout with LEFT-TO-RIGHT bias for relationships
 export function forceDirectedLayout(
   tables: Table[],
   relationships: Relationship[],
@@ -83,23 +83,47 @@ export function forceDirectedLayout(
   // Calculate the average node height for spacing
   const avgHeight = tables.reduce((sum, t) => sum + calculateNodeHeight(t.columns.length), 0) / tables.length;
 
-  const nodes = tables.map((table) => ({
-    id: table.id,
-    x: Math.random() * 1000 + 100,
-    y: Math.random() * 800 + 100,
-    vx: 0,
-    vy: 0,
-    table,
-    height: calculateNodeHeight(table.columns.length),
-  }));
+  // Initialize with left-to-right bias based on relationship direction
+  // Tables that are referenced (targets) should start more to the right
+  const referenceCount = new Map<string, number>();
+  const referencedByCount = new Map<string, number>();
+
+  for (const table of tables) {
+    referenceCount.set(table.id, 0);
+    referencedByCount.set(table.id, 0);
+  }
+
+  for (const rel of relationships) {
+    referenceCount.set(rel.sourceTable, (referenceCount.get(rel.sourceTable) || 0) + 1);
+    referencedByCount.set(rel.targetTable, (referencedByCount.get(rel.targetTable) || 0) + 1);
+  }
+
+  // Calculate initial X position based on "depth" - tables that reference others are on the left
+  const nodes = tables.map((table, index) => {
+    const refs = referenceCount.get(table.id) || 0;
+    const refdBy = referencedByCount.get(table.id) || 0;
+    // More references = more to the left, more referenced by = more to the right
+    const xBias = (refdBy - refs) * 200 + 500;
+
+    return {
+      id: table.id,
+      x: xBias + (Math.random() - 0.5) * 200,
+      y: 100 + index * 120,
+      vx: 0,
+      vy: 0,
+      table,
+      height: calculateNodeHeight(table.columns.length),
+    };
+  });
 
   const nodeMap = new Map(nodes.map(n => [n.id, n]));
 
-  // Simulation parameters - adjusted for dynamic heights
-  const repulsion = 12000;
-  const attraction = 0.03;
+  // Simulation parameters
+  const repulsion = 15000;
+  const attraction = 0.02;
   const damping = 0.8;
   const minDistance = Math.max(400, avgHeight + 100);
+  const horizontalBias = 0.3; // Encourage source to be left of target
 
   for (let i = 0; i < iterations; i++) {
     // Apply repulsion between all nodes
@@ -125,7 +149,7 @@ export function forceDirectedLayout(
       }
     }
 
-    // Apply attraction along edges
+    // Apply attraction along edges with LEFT-TO-RIGHT bias
     for (const rel of relationships) {
       const source = nodeMap.get(rel.sourceTable);
       const target = nodeMap.get(rel.targetTable);
@@ -143,6 +167,12 @@ export function forceDirectedLayout(
         source.vy += fy;
         target.vx -= fx;
         target.vy -= fy;
+
+        // LEFT-TO-RIGHT BIAS: push source left, target right
+        if (source.x > target.x - 100) {
+          source.vx -= horizontalBias * 50;
+          target.vx += horizontalBias * 50;
+        }
       }
     }
 
@@ -155,8 +185,8 @@ export function forceDirectedLayout(
       node.y += node.vy;
 
       // Keep nodes within bounds
-      node.x = Math.max(50, Math.min(1500, node.x));
-      node.y = Math.max(50, Math.min(1000, node.y));
+      node.x = Math.max(80, Math.min(1600, node.x));
+      node.y = Math.max(80, Math.min(1000, node.y));
     }
   }
 
@@ -255,34 +285,39 @@ export function optimizeLayout(
   return result;
 }
 
-// Hierarchical layout for trees
+// Hierarchical layout for trees - LEFT TO RIGHT flow for clean edge routing
 export function hierarchicalLayout(
   tables: Table[],
   relationships: Relationship[]
 ): Node[] {
   if (tables.length === 0) return [];
 
-  // Build adjacency list
-  const children = new Map<string, string[]>();
-  const parents = new Map<string, string[]>();
+  // Build adjacency list - source tables connect to target tables
+  // For left-to-right: source (FK table) should be to the LEFT of target (PK table)
+  const outgoing = new Map<string, string[]>(); // source -> targets
+  const incoming = new Map<string, string[]>(); // target -> sources
 
   for (const table of tables) {
-    children.set(table.id, []);
-    parents.set(table.id, []);
+    outgoing.set(table.id, []);
+    incoming.set(table.id, []);
   }
 
   for (const rel of relationships) {
-    children.get(rel.targetTable)?.push(rel.sourceTable);
-    parents.get(rel.sourceTable)?.push(rel.targetTable);
+    outgoing.get(rel.sourceTable)?.push(rel.targetTable);
+    incoming.get(rel.targetTable)?.push(rel.sourceTable);
   }
 
-  // Find root nodes (tables with no parents)
-  const roots = tables.filter(t => parents.get(t.id)?.length === 0);
+  // Find root nodes (tables that ARE referenced but don't reference others, or have no incoming)
+  // These should be on the RIGHT side (PK/lookup tables)
+  const roots = tables.filter(t => outgoing.get(t.id)?.length === 0 && incoming.get(t.id)?.length! > 0);
 
-  // If no roots found, use all tables
-  const startNodes = roots.length > 0 ? roots : tables;
+  // If no roots found, find tables with no incoming references (true roots, on left)
+  const leftRoots = tables.filter(t => incoming.get(t.id)?.length === 0);
 
-  // BFS to assign levels
+  // Use left roots for BFS, but we'll reverse the level at the end
+  const startNodes = leftRoots.length > 0 ? leftRoots : (roots.length > 0 ? roots : tables);
+
+  // BFS to assign levels - follow outgoing edges
   const levels = new Map<string, number>();
   const visited = new Set<string>();
   const queue: { id: string; level: number }[] = startNodes.map(t => ({ id: t.id, level: 0 }));
@@ -294,10 +329,11 @@ export function hierarchicalLayout(
     visited.add(id);
     levels.set(id, level);
 
-    const childIds = children.get(id) || [];
-    for (const childId of childIds) {
-      if (!visited.has(childId)) {
-        queue.push({ id: childId, level: level + 1 });
+    // Follow outgoing edges (source -> target), target goes to next level (right)
+    const targetIds = outgoing.get(id) || [];
+    for (const targetId of targetIds) {
+      if (!visited.has(targetId)) {
+        queue.push({ id: targetId, level: level + 1 });
       }
     }
   }
@@ -309,7 +345,7 @@ export function hierarchicalLayout(
     }
   }
 
-  // Group by level
+  // Group by level (column)
   const levelGroups = new Map<number, Table[]>();
   for (const table of tables) {
     const level = levels.get(table.id) || 0;
@@ -319,42 +355,36 @@ export function hierarchicalLayout(
     levelGroups.get(level)!.push(table);
   }
 
-  // Position nodes with dynamic level heights
+  // Position nodes HORIZONTALLY (left to right) instead of vertically
   const nodes: Node[] = [];
-  const nodeSpacing = 400;
+  const columnSpacing = 420; // Horizontal gap between columns
+  const rowSpacing = 100; // Vertical gap between rows in same column
 
-  // Calculate Y position for each level based on max height of previous level
-  const levelYPositions = new Map<number, number>();
   const sortedLevels = Array.from(levelGroups.keys()).sort((a, b) => a - b);
 
-  let currentY = 50;
-  sortedLevels.forEach((level, idx) => {
-    levelYPositions.set(level, currentY);
-    if (idx < sortedLevels.length - 1) {
-      const maxHeightInLevel = Math.max(
-        ...levelGroups.get(level)!.map(t => calculateNodeHeight(t.columns.length))
-      );
-      currentY += maxHeightInLevel + 80; // 80px gap between levels
-    }
-  });
+  for (const level of sortedLevels) {
+    const levelTables = levelGroups.get(level)!;
 
-  for (const [level, levelTables] of levelGroups) {
-    const levelWidth = levelTables.length * nodeSpacing;
-    const startX = -levelWidth / 2 + nodeSpacing / 2 + 500;
+    // Calculate total height needed for this column
+    let currentY = 80;
 
-    levelTables.forEach((table, index) => {
+    levelTables.forEach((table) => {
+      const nodeHeight = calculateNodeHeight(table.columns.length);
+
       nodes.push({
         id: table.id,
         type: 'tableNode',
         position: {
-          x: startX + index * nodeSpacing,
-          y: levelYPositions.get(level) || 50,
+          x: 80 + level * columnSpacing, // X increases with level (left to right)
+          y: currentY,
         },
         data: {
           table,
           isSelected: false,
         },
       });
+
+      currentY += nodeHeight + rowSpacing;
     });
   }
 
