@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User, Sparkles, ChevronRight, Trash2, Minimize2, Crown } from 'lucide-react';
+import { Send, FileCode, User, Sparkles, ChevronRight, Trash2, Minimize2, Crown } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { useAuthStore } from '../../store/useAuthStore';
 
@@ -69,7 +69,7 @@ const ChatPanel: React.FC = () => {
         onClick={() => setIsMinimized(false)}
         className="hidden lg:flex fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-br from-blue-600 to-purple-600 rounded-full shadow-lg shadow-purple-500/30 items-center justify-center hover:scale-110 transition-transform z-50"
       >
-        <Bot className="w-6 h-6 text-white" />
+        <FileCode className="w-6 h-6 text-white" />
       </button>
     );
   }
@@ -80,11 +80,11 @@ const ChatPanel: React.FC = () => {
       <div className="p-4 border-b border-slate-700 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-            <Bot className="w-4 h-4 text-white" />
+            <FileCode className="w-4 h-4 text-white" />
           </div>
           <div>
-            <h2 className="font-semibold text-white text-sm">Schema Assistant</h2>
-            <p className="text-xs text-slate-400">Ask questions about your schema</p>
+            <h2 className="font-semibold text-white text-sm">Report Builder</h2>
+            <p className="text-xs text-slate-400">Generate SQL queries from your schema</p>
           </div>
         </div>
         <div className="flex items-center gap-1">
@@ -223,7 +223,7 @@ const ChatPanel: React.FC = () => {
   );
 };
 
-// Enhanced response generator that actually analyzes the schema
+// Report Builder - generates SQL queries from schema relationships
 function generateResponse(
   input: string,
   tables: any[],
@@ -238,33 +238,36 @@ function generateResponse(
     words.some(w => w === t.name.toLowerCase())
   );
 
+  // Find multiple mentioned tables for complex queries
+  const mentionedTables = tables.filter(t =>
+    lowerInput.includes(t.name.toLowerCase())
+  );
+
   // Help & capabilities
   if (lowerInput.includes('help') || lowerInput === 'what can you do' || lowerInput === '?') {
     return {
-      content: `I can analyze your database schema and help you with:
+      content: `## Report Builder
 
-**Schema Analysis**
-- Explain any table (try: "explain users table")
-- Show column details and types
-- Identify primary/foreign keys
+I help you generate SQL queries from your schema relationships.
 
-**Relationships**
-- Show all relationships between tables
-- Find missing foreign key constraints
-- Explain how tables connect
+**Quick Queries**
+- \`"query [table]"\` - SELECT all from a table
+- \`"join [table1] and [table2]"\` - JOIN two related tables
+- \`"report on [table]"\` - Full report with all joins
 
-**Best Practices**
-- Check for missing primary keys
-- Find potential normalization issues
-- Suggest indexes for common patterns
+**Complex Queries**
+- \`"aggregate [table] by [column]"\` - GROUP BY with COUNT
+- \`"filter [table] where..."\` - WHERE clause queries
+- \`"all related to [table]"\` - Multi-table JOIN
 
-**SQL Generation**
-- Generate SELECT queries for tables
-- Create JOIN queries based on relationships
+**Analysis**
+- \`"analyze schema"\` - Check for issues
+- \`"show relationships"\` - View all connections
+- \`"explain [table]"\` - Table details
 
-What would you like to know?`,
+Try: "report on ${tables[0]?.name || 'orders'}"`,
       suggestions: tables.length > 0
-        ? ['Analyze my schema', `Explain ${tables[0]?.name}`, 'Show relationships']
+        ? [`Report on ${tables[0]?.name}`, `Join all tables`, 'Show relationships']
         : ['How to import SQL', 'Load demo'],
     };
   }
@@ -310,13 +313,12 @@ What would you like to know?`,
   // Generate SELECT query for a table
   if (matchedTable && (lowerInput.includes('query') || lowerInput.includes('select') || lowerInput.includes('sql for'))) {
     const t = matchedTable;
-    const cols = t.columns.slice(0, 5).map((c: any) => c.name).join(',\n  ');
-    const hasMore = t.columns.length > 5;
+    const cols = t.columns.map((c: any) => `${t.name}.${c.name}`).join(',\n    ');
 
     // Find related tables for JOIN suggestions
     const rels = relationships.filter((r: any) => r.sourceTable === t.id || r.targetTable === t.id);
 
-    let sql = `\`\`\`sql\nSELECT\n  ${cols}${hasMore ? ',\n  -- ... more columns' : ''}\nFROM ${t.name}`;
+    let sql = `\`\`\`sql\nSELECT\n    ${cols}\nFROM ${t.name}`;
 
     if (rels.length > 0) {
       const rel = rels[0];
@@ -325,15 +327,189 @@ What would you like to know?`,
       if (otherTable) {
         const joinCol = rel.sourceTable === t.id ? rel.sourceColumn : rel.targetColumn;
         const otherCol = rel.sourceTable === t.id ? rel.targetColumn : rel.sourceColumn;
-        sql += `\nJOIN ${otherTable.name} ON ${t.name}.${joinCol} = ${otherTable.name}.${otherCol}`;
+        sql += `\nLEFT JOIN ${otherTable.name}\n    ON ${t.name}.${joinCol} = ${otherTable.name}.${otherCol}`;
       }
     }
 
-    sql += '\nWHERE 1=1\nLIMIT 100;\n\`\`\`';
+    sql += '\nWHERE 1=1\nORDER BY 1\nLIMIT 100;\n\`\`\`';
 
     return {
-      content: `Here's a sample query for **${t.name}**:\n\n${sql}`,
-      suggestions: ['Add more joins', 'Explain this table', 'Show all tables'],
+      content: `**Query for ${t.name}:**\n\n${sql}`,
+      suggestions: [`Report on ${t.name}`, `Aggregate ${t.name}`, 'Join all tables'],
+    };
+  }
+
+  // Generate full report query with all related tables
+  if (matchedTable && (lowerInput.includes('report') || lowerInput.includes('full') || lowerInput.includes('all related'))) {
+    const t = matchedTable;
+    const visited = new Set<string>([t.id]);
+    const joinedTables: any[] = [t];
+    const joinClauses: string[] = [];
+
+    // BFS to find all connected tables
+    const queue = [t.id];
+    while (queue.length > 0 && joinedTables.length < 6) {
+      const currentId = queue.shift()!;
+      const currentRels = relationships.filter((r: any) =>
+        r.sourceTable === currentId || r.targetTable === currentId
+      );
+
+      for (const rel of currentRels) {
+        const otherId = rel.sourceTable === currentId ? rel.targetTable : rel.sourceTable;
+        if (!visited.has(otherId)) {
+          visited.add(otherId);
+          const otherTable = tables.find((tt: any) => tt.id === otherId);
+          if (otherTable) {
+            joinedTables.push(otherTable);
+            queue.push(otherId);
+
+            const leftTable = rel.sourceTable === currentId
+              ? tables.find((tt: any) => tt.id === currentId)
+              : otherTable;
+            const rightTable = rel.sourceTable === currentId
+              ? otherTable
+              : tables.find((tt: any) => tt.id === currentId);
+            const leftCol = rel.sourceTable === currentId ? rel.sourceColumn : rel.targetColumn;
+            const rightCol = rel.sourceTable === currentId ? rel.targetColumn : rel.sourceColumn;
+
+            joinClauses.push(`LEFT JOIN ${otherTable.name}\n    ON ${leftTable?.name}.${leftCol} = ${rightTable?.name}.${rightCol}`);
+          }
+        }
+      }
+    }
+
+    // Build column list with table prefixes
+    const columns = joinedTables.flatMap((jt: any) =>
+      jt.columns.slice(0, 4).map((c: any) => `${jt.name}.${c.name}`)
+    );
+
+    let sql = `\`\`\`sql\n-- Report: ${t.name} with related data\nSELECT\n    ${columns.join(',\n    ')}\nFROM ${t.name}`;
+    if (joinClauses.length > 0) {
+      sql += '\n' + joinClauses.join('\n');
+    }
+    sql += '\nWHERE 1=1\nORDER BY 1 DESC\nLIMIT 100;\n\`\`\`';
+
+    return {
+      content: `**Full Report for ${t.name}** (${joinedTables.length} tables):\n\n${sql}\n\n*Includes: ${joinedTables.map((jt: any) => jt.name).join(', ')}*`,
+      suggestions: ['Add aggregation', `Query ${t.name} only`, 'Export diagram'],
+    };
+  }
+
+  // Aggregate query
+  if (matchedTable && (lowerInput.includes('aggregate') || lowerInput.includes('count') || lowerInput.includes('group') || lowerInput.includes('sum'))) {
+    const t = matchedTable;
+    const dateCol = t.columns.find((c: any) =>
+      c.name.toLowerCase().includes('date') || c.name.toLowerCase().includes('created') || c.type.toLowerCase().includes('date')
+    );
+    const groupCol = dateCol || t.columns.find((c: any) => c.isForeignKey) || t.columns[1];
+
+    let sql = `\`\`\`sql\n-- Aggregation report for ${t.name}\nSELECT\n    ${groupCol?.name || 'id'},\n    COUNT(*) as total_count`;
+
+    // Add SUM for numeric columns
+    const numericCols = t.columns.filter((c: any) =>
+      c.type.toLowerCase().includes('int') ||
+      c.type.toLowerCase().includes('decimal') ||
+      c.type.toLowerCase().includes('numeric') ||
+      c.name.toLowerCase().includes('amount') ||
+      c.name.toLowerCase().includes('price') ||
+      c.name.toLowerCase().includes('total')
+    ).slice(0, 2);
+
+    numericCols.forEach((nc: any) => {
+      sql += `,\n    SUM(${nc.name}) as total_${nc.name}`;
+    });
+
+    sql += `\nFROM ${t.name}\nGROUP BY ${groupCol?.name || 'id'}\nORDER BY total_count DESC\nLIMIT 20;\n\`\`\``;
+
+    return {
+      content: `**Aggregation Report for ${t.name}:**\n\n${sql}`,
+      suggestions: [`Report on ${t.name}`, 'Show relationships', 'Query another table'],
+    };
+  }
+
+  // Join two mentioned tables
+  if (mentionedTables.length >= 2 && (lowerInput.includes('join') || lowerInput.includes('combine') || lowerInput.includes('and'))) {
+    const t1 = mentionedTables[0];
+    const t2 = mentionedTables[1];
+
+    // Find relationship between them
+    const rel = relationships.find((r: any) =>
+      (r.sourceTable === t1.id && r.targetTable === t2.id) ||
+      (r.sourceTable === t2.id && r.targetTable === t1.id)
+    );
+
+    if (rel) {
+      const leftTable = rel.sourceTable === t1.id ? t1 : t2;
+      const rightTable = rel.sourceTable === t1.id ? t2 : t1;
+      const leftCol = rel.sourceColumn;
+      const rightCol = rel.targetColumn;
+
+      const cols1 = t1.columns.slice(0, 3).map((c: any) => `${t1.name}.${c.name}`);
+      const cols2 = t2.columns.slice(0, 3).map((c: any) => `${t2.name}.${c.name}`);
+
+      const sql = `\`\`\`sql\nSELECT\n    ${[...cols1, ...cols2].join(',\n    ')}\nFROM ${leftTable.name}\nINNER JOIN ${rightTable.name}\n    ON ${leftTable.name}.${leftCol} = ${rightTable.name}.${rightCol}\nLIMIT 100;\n\`\`\``;
+
+      return {
+        content: `**Join ${t1.name} and ${t2.name}:**\n\n${sql}`,
+        suggestions: [`Report on ${t1.name}`, `Aggregate ${t2.name}`, 'Join all tables'],
+      };
+    } else {
+      return {
+        content: `No direct relationship found between **${t1.name}** and **${t2.name}**.\n\nYou may need to join through an intermediate table, or create a relationship in the ERD.`,
+        suggestions: ['Show relationships', `Report on ${t1.name}`, `Report on ${t2.name}`],
+      };
+    }
+  }
+
+  // Join all tables
+  if (lowerInput.includes('join all') || lowerInput.includes('all tables') || lowerInput.includes('everything')) {
+    if (tables.length === 0) {
+      return {
+        content: "No tables loaded. Import your SQL first!",
+        suggestions: ['How to import SQL', 'Load demo'],
+      };
+    }
+    if (tables.length === 1) {
+      return {
+        content: `Only one table loaded: **${tables[0].name}**. Add more tables to create joins.`,
+        suggestions: [`Query ${tables[0].name}`, 'How to import SQL'],
+      };
+    }
+
+    // Start with first table and join all connected
+    const t = tables[0];
+    const visited = new Set<string>([t.id]);
+    const joinClauses: string[] = [];
+    const joinedNames = [t.name];
+
+    for (const rel of relationships) {
+      const isSource = rel.sourceTable === t.id || visited.has(rel.sourceTable);
+      const isTarget = rel.targetTable === t.id || visited.has(rel.targetTable);
+
+      if (isSource && !visited.has(rel.targetTable)) {
+        const targetTable = tables.find((tt: any) => tt.id === rel.targetTable);
+        if (targetTable) {
+          const sourceTable = tables.find((tt: any) => tt.id === rel.sourceTable);
+          visited.add(rel.targetTable);
+          joinedNames.push(targetTable.name);
+          joinClauses.push(`LEFT JOIN ${targetTable.name} ON ${sourceTable?.name}.${rel.sourceColumn} = ${targetTable.name}.${rel.targetColumn}`);
+        }
+      } else if (isTarget && !visited.has(rel.sourceTable)) {
+        const sourceTable = tables.find((tt: any) => tt.id === rel.sourceTable);
+        if (sourceTable) {
+          const targetTable = tables.find((tt: any) => tt.id === rel.targetTable);
+          visited.add(rel.sourceTable);
+          joinedNames.push(sourceTable.name);
+          joinClauses.push(`LEFT JOIN ${sourceTable.name} ON ${sourceTable.name}.${rel.sourceColumn} = ${targetTable?.name}.${rel.targetColumn}`);
+        }
+      }
+    }
+
+    const sql = `\`\`\`sql\n-- Full schema query\nSELECT *\nFROM ${t.name}\n${joinClauses.join('\n')}\nLIMIT 50;\n\`\`\``;
+
+    return {
+      content: `**Join All Related Tables:**\n\n${sql}\n\n*Connected tables: ${joinedNames.join(', ')}*`,
+      suggestions: [`Report on ${t.name}`, 'Show relationships', 'Aggregate data'],
     };
   }
 

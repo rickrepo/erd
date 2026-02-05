@@ -13,7 +13,7 @@ import { useStore } from './store/useStore';
 import { useAuthStore } from './store/useAuthStore';
 import { useAdminStore } from './store/useAdminStore';
 import { DEMO_TABLES, DEMO_RELATIONSHIPS, DEMO_SQL_QUERIES } from './utils/demoData';
-import { Code, GitBranch, MessageSquare } from 'lucide-react';
+import { Code, GitBranch, FileCode } from 'lucide-react';
 
 type MobilePanel = 'sidebar' | 'canvas' | 'chat';
 
@@ -130,7 +130,7 @@ const App: React.FC = () => {
   const mobileTabs: { id: MobilePanel; label: string; icon: typeof Code; badge?: number }[] = [
     { id: 'sidebar', label: 'SQL', icon: Code },
     { id: 'canvas', label: 'ERD', icon: GitBranch, badge: tables.length },
-    { id: 'chat', label: 'Chat', icon: MessageSquare },
+    { id: 'chat', label: 'Report', icon: FileCode },
   ];
 
   return (

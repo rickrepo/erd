@@ -77,21 +77,22 @@ interface ERDStore {
 const createWelcomeMessage = (): ChatMessage => ({
   id: 'welcome',
   role: 'assistant' as const,
-  content: `Welcome to **SchemaFlow**! I'm here to help you visualize and design your database schema.
+  content: `## Report Builder
 
-**Quick Start:**
+I generate SQL queries from your schema relationships.
 
-1. **Paste SQL** - Add your queries or CREATE TABLE statements
-2. **Auto-detect** - I'll find tables and relationships automatically
-3. **Refine** - Review inferred connections and adjust as needed
-4. **Export** - Download your professional ERD diagram
+**Once you have tables loaded, try:**
+- \`"query [table]"\` - Basic SELECT
+- \`"report on [table]"\` - Full JOIN with related tables
+- \`"aggregate [table]"\` - GROUP BY with counts
+- \`"join [table1] and [table2]"\` - Custom JOINs
 
-Try the interactive demo or paste your own SQL to begin!`,
+Load your schema from the SQL tab, then come back here to generate queries!`,
   timestamp: new Date(),
   suggestions: [
-    'Load demo schema',
-    'Paste my SQL',
-    'How does this work?'
+    'Help',
+    'Show tables',
+    'Load demo'
   ]
 });
 

@@ -1,7 +1,7 @@
-import { memo, useState, useCallback } from 'react';
+import { memo, useState } from 'react';
 import { Handle, Position } from '@xyflow/react';
 import type { NodeProps } from '@xyflow/react';
-import { Key, Link, ChevronDown, ChevronUp, Circle } from 'lucide-react';
+import { Key, Link, Circle } from 'lucide-react';
 import type { Table, Column } from '../../types';
 
 interface TableNodeData {
@@ -12,28 +12,15 @@ interface TableNodeData {
   isExporting?: boolean;
 }
 
-const MAX_VISIBLE_COLUMNS = 8;
-
+// Industry standard: Show all columns without truncation
 function TableNode({ data, selected }: NodeProps) {
   const nodeData = data as unknown as TableNodeData;
   const { table, onColumnClick, isExporting } = nodeData;
   const isSelected = selected || nodeData.isSelected;
-  const [isExpanded, setIsExpanded] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
-
-  const hasMany = table.columns.length > MAX_VISIBLE_COLUMNS;
-  const visibleColumns = isExpanded || isExporting
-    ? table.columns
-    : table.columns.slice(0, MAX_VISIBLE_COLUMNS);
-  const hiddenCount = table.columns.length - MAX_VISIBLE_COLUMNS;
 
   const pkColumns = table.columns.filter(c => c.isPrimaryKey);
   const fkColumns = table.columns.filter(c => c.isForeignKey);
-
-  const toggleExpand = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
-    setIsExpanded(!isExpanded);
-  }, [isExpanded]);
 
   const getColumnIcon = (column: Column) => {
     if (column.isPrimaryKey) {
@@ -110,18 +97,15 @@ function TableNode({ data, selected }: NodeProps) {
         </div>
       </div>
 
-      {/* Columns */}
-      <div
-        className={`bg-slate-800/50 ${hasMany && !isExporting ? 'max-h-[280px] overflow-y-auto' : ''}`}
-        style={{ scrollbarWidth: 'thin' }}
-      >
-        {visibleColumns.map((column: Column, index: number) => (
+      {/* Columns - show all columns (industry standard) */}
+      <div className="bg-slate-800/50">
+        {table.columns.map((column: Column, index: number) => (
           <div
             key={column.name}
             className={`
               relative px-3 py-1.5 flex items-center gap-2 text-xs
               hover:bg-slate-700/50 cursor-pointer transition-colors group
-              ${index !== visibleColumns.length - 1 || (hasMany && !isExpanded && !isExporting) ? 'border-b border-slate-700/30' : ''}
+              ${index !== table.columns.length - 1 ? 'border-b border-slate-700/30' : ''}
             `}
             onClick={() => onColumnClick?.(column)}
           >
@@ -180,26 +164,6 @@ function TableNode({ data, selected }: NodeProps) {
           </div>
         ))}
       </div>
-
-      {/* Expand/Collapse for many columns */}
-      {hasMany && !isExporting && (
-        <button
-          onClick={toggleExpand}
-          className="w-full px-3 py-2 flex items-center justify-center gap-1 text-xs text-slate-400 hover:text-white hover:bg-slate-700/50 transition-colors border-t border-slate-700/30"
-        >
-          {isExpanded ? (
-            <>
-              <ChevronUp className="w-3 h-3" />
-              Show less
-            </>
-          ) : (
-            <>
-              <ChevronDown className="w-3 h-3" />
-              Show {hiddenCount} more columns
-            </>
-          )}
-        </button>
-      )}
 
       {/* Footer - FK references summary */}
       {fkColumns.length > 0 && (

@@ -12,28 +12,46 @@ interface LayoutOptions {
 
 const DEFAULT_OPTIONS: LayoutOptions = {
   spacing: {
-    horizontal: 400,
-    vertical: 300,
+    horizontal: 420,
+    vertical: 80, // Reduced - we calculate based on actual node heights
   },
   nodeWidth: 280,
   nodeHeight: 250,
 };
 
-// Calculate node height based on number of columns
+// Calculate node height based on number of columns (matching TableNode rendering)
 export function calculateNodeHeight(columnCount: number): number {
-  const headerHeight = 48;
-  const columnHeight = 32;
-  const padding = 16;
-  return headerHeight + (columnCount * columnHeight) + padding;
+  const headerHeight = 56; // Header with table name and stats
+  const columnHeight = 28; // Each column row
+  const footerHeight = 32; // FK references footer (approximate)
+  const padding = 8;
+  return headerHeight + (columnCount * columnHeight) + footerHeight + padding;
 }
 
-// Simple grid layout
+// Simple grid layout with dynamic row heights
 export function gridLayout(
   tables: Table[],
   options: Partial<LayoutOptions> = {}
 ): Node[] {
   const opts = { ...DEFAULT_OPTIONS, ...options };
   const cols = Math.ceil(Math.sqrt(tables.length));
+
+  // Calculate row heights based on tallest node in each row
+  const rows: Table[][] = [];
+  tables.forEach((table, index) => {
+    const rowIndex = Math.floor(index / cols);
+    if (!rows[rowIndex]) rows[rowIndex] = [];
+    rows[rowIndex].push(table);
+  });
+
+  // Calculate cumulative Y positions
+  const rowYPositions: number[] = [50];
+  rows.forEach((_row, rowIndex) => {
+    if (rowIndex > 0) {
+      const prevRowMaxHeight = Math.max(...rows[rowIndex - 1].map(t => calculateNodeHeight(t.columns.length)));
+      rowYPositions.push(rowYPositions[rowIndex - 1] + prevRowMaxHeight + opts.spacing.vertical);
+    }
+  });
 
   return tables.map((table, index) => {
     const row = Math.floor(index / cols);
@@ -44,7 +62,7 @@ export function gridLayout(
       type: 'tableNode',
       position: {
         x: col * opts.spacing.horizontal + 50,
-        y: row * opts.spacing.vertical + 50,
+        y: rowYPositions[row],
       },
       data: {
         table,
@@ -54,7 +72,7 @@ export function gridLayout(
   });
 }
 
-// Force-directed layout simulation
+// Force-directed layout simulation with dynamic node heights
 export function forceDirectedLayout(
   tables: Table[],
   relationships: Relationship[],
@@ -62,22 +80,26 @@ export function forceDirectedLayout(
 ): Node[] {
   if (tables.length === 0) return [];
 
+  // Calculate the average node height for spacing
+  const avgHeight = tables.reduce((sum, t) => sum + calculateNodeHeight(t.columns.length), 0) / tables.length;
+
   const nodes = tables.map((table) => ({
     id: table.id,
-    x: Math.random() * 800 + 100,
-    y: Math.random() * 600 + 100,
+    x: Math.random() * 1000 + 100,
+    y: Math.random() * 800 + 100,
     vx: 0,
     vy: 0,
     table,
+    height: calculateNodeHeight(table.columns.length),
   }));
 
   const nodeMap = new Map(nodes.map(n => [n.id, n]));
 
-  // Simulation parameters - increased for better spacing
-  const repulsion = 8000;
-  const attraction = 0.04;
-  const damping = 0.85;
-  const minDistance = 350;
+  // Simulation parameters - adjusted for dynamic heights
+  const repulsion = 12000;
+  const attraction = 0.03;
+  const damping = 0.8;
+  const minDistance = Math.max(400, avgHeight + 100);
 
   for (let i = 0; i < iterations; i++) {
     // Apply repulsion between all nodes
@@ -297,10 +319,24 @@ export function hierarchicalLayout(
     levelGroups.get(level)!.push(table);
   }
 
-  // Position nodes - increased spacing for better visibility
+  // Position nodes with dynamic level heights
   const nodes: Node[] = [];
-  const levelSpacing = 350;
-  const nodeSpacing = 380;
+  const nodeSpacing = 400;
+
+  // Calculate Y position for each level based on max height of previous level
+  const levelYPositions = new Map<number, number>();
+  const sortedLevels = Array.from(levelGroups.keys()).sort((a, b) => a - b);
+
+  let currentY = 50;
+  sortedLevels.forEach((level, idx) => {
+    levelYPositions.set(level, currentY);
+    if (idx < sortedLevels.length - 1) {
+      const maxHeightInLevel = Math.max(
+        ...levelGroups.get(level)!.map(t => calculateNodeHeight(t.columns.length))
+      );
+      currentY += maxHeightInLevel + 80; // 80px gap between levels
+    }
+  });
 
   for (const [level, levelTables] of levelGroups) {
     const levelWidth = levelTables.length * nodeSpacing;
@@ -312,7 +348,7 @@ export function hierarchicalLayout(
         type: 'tableNode',
         position: {
           x: startX + index * nodeSpacing,
-          y: level * levelSpacing + 50,
+          y: levelYPositions.get(level) || 50,
         },
         data: {
           table,

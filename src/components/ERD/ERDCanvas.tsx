@@ -573,7 +573,7 @@ const ERDCanvas: React.FC = () => {
   // Re-layout with animation
   const handleLayout = useCallback((type: LayoutType) => {
     setLayoutType(type);
-    setTimeout(() => fitView({ padding: 0.15, duration: 500 }), 100);
+    setTimeout(() => fitView({ padding: 0.2, maxZoom: 1, duration: 500 }), 100);
   }, [fitView]);
 
   return (
@@ -596,9 +596,9 @@ const ERDCanvas: React.FC = () => {
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         fitView
-        fitViewOptions={{ padding: 0.15 }}
+        fitViewOptions={{ padding: 0.2, maxZoom: 1 }}
         minZoom={0.1}
-        maxZoom={2}
+        maxZoom={1.5}
         defaultEdgeOptions={{
           type: 'relationship',
         }}
