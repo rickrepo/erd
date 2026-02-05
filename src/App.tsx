@@ -14,9 +14,10 @@ import { useStore } from './store/useStore';
 import { useAuthStore } from './store/useAuthStore';
 import { useAdminStore } from './store/useAdminStore';
 import { DEMO_TABLES, DEMO_RELATIONSHIPS, DEMO_SQL_QUERIES } from './utils/demoData';
-import { GitBranch, Code } from 'lucide-react';
+import { GitBranch, Code, Link } from 'lucide-react';
+import { MobileJoinsPanel } from './components/common/MobileJoinsPanel';
 
-type MobilePanel = 'sidebar' | 'canvas';
+type MobilePanel = 'sidebar' | 'canvas' | 'joins';
 
 // Inner component that has access to ReactFlow context
 const AppContent: React.FC = () => {
@@ -201,8 +202,9 @@ const AppContent: React.FC = () => {
   }
 
   const mobileTabs: { id: MobilePanel; label: string; icon: typeof Code; badge?: number }[] = [
-    { id: 'sidebar', label: 'SQL', icon: Code, badge: relationships.length },
+    { id: 'sidebar', label: 'SQL', icon: Code },
     { id: 'canvas', label: 'Diagram', icon: GitBranch, badge: tables.length },
+    { id: 'joins', label: 'Joins', icon: Link, badge: relationships.length },
   ];
 
   return (
@@ -252,6 +254,15 @@ const AppContent: React.FC = () => {
                   setActiveRelationships={setActiveRelationships}
                   animatingRelationship={animatingRelationship}
                   setAnimatingRelationship={setAnimatingRelationship}
+                />
+              </div>
+              <div className={mobilePanel === 'joins' ? 'h-full' : 'hidden'}>
+                <MobileJoinsPanel
+                  activeRelationships={activeRelationships}
+                  onToggleRelationship={handleToggleRelationship}
+                  onShowAll={handleShowAll}
+                  onHideAll={handleHideAll}
+                  onAnimateChain={handleAnimateChain}
                 />
               </div>
             </div>

@@ -76,11 +76,26 @@ const Sidebar: React.FC<SidebarProps> = ({
     setSqlDialect,
     setTables,
     setRelationships,
+    sqlInput: storeSqlInput,
+    setSqlInput: setStoreSqlInput,
   } = useStore();
 
   // SQL input expanded by default when no tables
   const [sqlExpanded, setSqlExpanded] = useState(tables.length === 0);
-  const [sqlInput, setSqlInput] = useState('');
+  const [sqlInput, setSqlInputLocal] = useState('');
+
+  // Sync local SQL input with store (for demo mode)
+  useEffect(() => {
+    if (storeSqlInput && !sqlInput) {
+      setSqlInputLocal(storeSqlInput);
+    }
+  }, [storeSqlInput]);
+
+  // Update both local state and store
+  const setSqlInput = (value: string) => {
+    setSqlInputLocal(value);
+    setStoreSqlInput(value);
+  };
   const [showDialectDropdown, setShowDialectDropdown] = useState(false);
   const dialectDropdownRef = useRef<HTMLDivElement>(null);
 

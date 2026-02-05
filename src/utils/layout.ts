@@ -201,18 +201,50 @@ export function forceDirectedLayout(
   }));
 }
 
-// Create edges from relationships
+// Create edges from relationships with smart handle selection
 export function createEdges(
   relationships: Relationship[],
-  _tables: Table[]
+  _tables: Table[],
+  nodePositions?: Map<string, { x: number; y: number }>
 ): Edge[] {
   return relationships.map(rel => {
+    // Determine best connection side based on relative positions
+    let sourceHandle = `${rel.sourceColumn}-right`;
+    let targetHandle = `${rel.targetColumn}-left`;
+
+    if (nodePositions) {
+      const sourcePos = nodePositions.get(rel.sourceTable);
+      const targetPos = nodePositions.get(rel.targetTable);
+
+      if (sourcePos && targetPos) {
+        const dx = targetPos.x - sourcePos.x;
+
+        // If target is to the left of source, reverse the handles
+        if (dx < -100) {
+          sourceHandle = `${rel.sourceColumn}-left`;
+          targetHandle = `${rel.targetColumn}-right`;
+        } else if (Math.abs(dx) < 100) {
+          // Nodes are roughly vertically aligned - use vertical offset to decide
+          const dy = targetPos.y - sourcePos.y;
+          if (dy > 0) {
+            // Target below source - source exits right, target enters left
+            sourceHandle = `${rel.sourceColumn}-right`;
+            targetHandle = `${rel.targetColumn}-left`;
+          } else {
+            // Target above source
+            sourceHandle = `${rel.sourceColumn}-right`;
+            targetHandle = `${rel.targetColumn}-left`;
+          }
+        }
+      }
+    }
+
     return {
       id: rel.id,
       source: rel.sourceTable,
       target: rel.targetTable,
-      sourceHandle: `${rel.sourceColumn}-right`,
-      targetHandle: `${rel.targetColumn}-left`,
+      sourceHandle,
+      targetHandle,
       type: 'smoothstep',
       animated: false,
       style: {
@@ -355,18 +387,45 @@ export function hierarchicalLayout(
     levelGroups.get(level)!.push(table);
   }
 
-  // Position nodes HORIZONTALLY (left to right) instead of vertically
+  // Sort tables within each level by number of connections for better visual grouping
+  for (const [_, levelTables] of levelGroups) {
+    levelTables.sort((a, b) => {
+      const aConnections = (outgoing.get(a.id)?.length || 0) + (incoming.get(a.id)?.length || 0);
+      const bConnections = (outgoing.get(b.id)?.length || 0) + (incoming.get(b.id)?.length || 0);
+      return bConnections - aConnections; // More connected tables first
+    });
+  }
+
+  // Position nodes HORIZONTALLY (left to right) with proper vertical spacing
   const nodes: Node[] = [];
-  const columnSpacing = 420; // Horizontal gap between columns
-  const rowSpacing = 100; // Vertical gap between rows in same column
+  const columnSpacing = 380; // Horizontal gap between columns
+  const minRowSpacing = 40; // Minimum vertical gap between rows in same column
 
   const sortedLevels = Array.from(levelGroups.keys()).sort((a, b) => a - b);
 
+  // Calculate total height for each column to center them
+  const columnHeights: number[] = [];
   for (const level of sortedLevels) {
     const levelTables = levelGroups.get(level)!;
+    let totalHeight = 0;
+    levelTables.forEach((table, idx) => {
+      totalHeight += calculateNodeHeight(table.columns.length);
+      if (idx < levelTables.length - 1) totalHeight += minRowSpacing;
+    });
+    columnHeights.push(totalHeight);
+  }
 
-    // Calculate total height needed for this column
-    let currentY = 80;
+  const maxColumnHeight = Math.max(...columnHeights);
+
+  for (let levelIdx = 0; levelIdx < sortedLevels.length; levelIdx++) {
+    const level = sortedLevels[levelIdx];
+    const levelTables = levelGroups.get(level)!;
+
+    // Center this column vertically
+    const columnHeight = columnHeights[levelIdx];
+    const startY = Math.max(60, (maxColumnHeight - columnHeight) / 2 + 60);
+
+    let currentY = startY;
 
     levelTables.forEach((table) => {
       const nodeHeight = calculateNodeHeight(table.columns.length);
@@ -375,7 +434,7 @@ export function hierarchicalLayout(
         id: table.id,
         type: 'tableNode',
         position: {
-          x: 80 + level * columnSpacing, // X increases with level (left to right)
+          x: 80 + level * columnSpacing,
           y: currentY,
         },
         data: {
@@ -384,7 +443,7 @@ export function hierarchicalLayout(
         },
       });
 
-      currentY += nodeHeight + rowSpacing;
+      currentY += nodeHeight + minRowSpacing;
     });
   }
 

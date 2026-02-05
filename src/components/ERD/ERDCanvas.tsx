@@ -378,9 +378,9 @@ const ERDCanvas: React.FC<ERDCanvasProps> = ({
     }));
   }, [tables, nodePositions, activeTableColumns, handleFKClick]);
 
-  // Calculate edges
+  // Calculate edges with smart handle selection based on node positions
   const initialEdges = useMemo(() => {
-    const edges = createEdges(relationships, tables);
+    const edges = createEdges(relationships, tables, nodePositions);
     return edges.map((edge: Edge) => ({
       ...edge,
       type: 'relationship',
@@ -391,7 +391,7 @@ const ERDCanvas: React.FC<ERDCanvasProps> = ({
         isAnimating: animatingRelationship === edge.id,
       },
     }));
-  }, [relationships, tables, activeRelationships, animatingRelationship]);
+  }, [relationships, tables, nodePositions, activeRelationships, animatingRelationship]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
