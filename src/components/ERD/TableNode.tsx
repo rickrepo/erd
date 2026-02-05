@@ -8,17 +8,20 @@ interface TableNodeData {
   table: Table;
   isSelected: boolean;
   isDimmed?: boolean;
+  activeRelationships?: Set<string>; // Which relationships are currently shown
+  onFKClick?: (tableId: string, columnName: string) => void;
   onColumnClick?: (column: Column) => void;
   onEditTable?: () => void;
   isExporting?: boolean;
 }
 
-// Professional ERD table node - shows all columns
+// Professional ERD table node with glowing FK indicators
 function TableNode({ data, selected }: NodeProps) {
   const nodeData = data as unknown as TableNodeData;
-  const { table, onColumnClick, isExporting, isDimmed } = nodeData;
+  const { table, onColumnClick, onFKClick, isExporting, isDimmed, activeRelationships } = nodeData;
   const isSelected = selected || nodeData.isSelected;
   const [isHovered, setIsHovered] = useState(false);
+  const [hoveredFK, setHoveredFK] = useState<string | null>(null);
 
   const pkColumns = table.columns.filter(c => c.isPrimaryKey);
   const fkColumns = table.columns.filter(c => c.isForeignKey);
@@ -45,8 +48,22 @@ function TableNode({ data, selected }: NodeProps) {
     return type.slice(0, 4).toLowerCase();
   };
 
+  // Check if this FK's relationship is currently active/shown
+  const isFKActive = (column: Column) => {
+    if (!activeRelationships || !column.isForeignKey) return false;
+    // Check if any active relationship involves this table and column
+    return activeRelationships.has(`${table.id}-${column.name}`);
+  };
+
   // Show handles when hovered, selected, or exporting
   const showHandles = isHovered || isSelected || isExporting;
+
+  const handleFKClick = (e: React.MouseEvent, column: Column) => {
+    e.stopPropagation();
+    if (column.isForeignKey && onFKClick) {
+      onFKClick(table.id, column.name);
+    }
+  };
 
   return (
     <div
@@ -92,98 +109,119 @@ function TableNode({ data, selected }: NodeProps) {
                 </span>
               )}
               <span className="text-[10px] text-white/60">
-                {table.columns.length} columns
+                {table.columns.length} cols
               </span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Columns - show all columns (industry standard) */}
+      {/* Columns */}
       <div className="bg-slate-800/50">
-        {table.columns.map((column: Column, index: number) => (
-          <div
-            key={column.name}
-            className={`
-              relative px-3 py-1.5 flex items-center gap-2 text-xs
-              hover:bg-slate-700/50 cursor-pointer transition-colors group
-              ${index !== table.columns.length - 1 ? 'border-b border-slate-700/30' : ''}
-            `}
-            onClick={() => onColumnClick?.(column)}
-          >
-            {/* Left handle */}
-            <Handle
-              type="target"
-              position={Position.Left}
-              id={`${column.name}-left`}
-              className={`!w-3 !h-3 !border-2 !border-slate-900 transition-all duration-200 ${
-                showHandles
-                  ? '!bg-blue-500 !opacity-100 hover:!bg-blue-400 hover:!scale-125'
-                  : '!bg-blue-500/40 !opacity-0'
-              }`}
-              style={{ left: -7 }}
-            />
+        {table.columns.map((column: Column, index: number) => {
+          const isFK = column.isForeignKey;
+          const isActiveFK = isFKActive(column);
+          const isHoveredFK = hoveredFK === column.name && isFK;
 
-            {/* Column icon */}
-            <div className="w-4 flex justify-center">
-              {getColumnIcon(column)}
+          return (
+            <div
+              key={column.name}
+              className={`
+                relative px-3 py-1.5 flex items-center gap-2 text-xs
+                transition-all duration-300 group
+                ${index !== table.columns.length - 1 ? 'border-b border-slate-700/30' : ''}
+                ${isFK ? 'cursor-pointer hover:bg-blue-500/20' : 'hover:bg-slate-700/50 cursor-pointer'}
+                ${isActiveFK ? 'bg-blue-500/30' : ''}
+              `}
+              onClick={(e) => isFK ? handleFKClick(e, column) : onColumnClick?.(column)}
+              onMouseEnter={() => isFK && setHoveredFK(column.name)}
+              onMouseLeave={() => setHoveredFK(null)}
+            >
+              {/* Left handle */}
+              <Handle
+                type="target"
+                position={Position.Left}
+                id={`${column.name}-left`}
+                className={`!w-3 !h-3 !border-2 !border-slate-900 transition-all duration-200 ${
+                  showHandles
+                    ? '!bg-blue-500 !opacity-100 hover:!bg-blue-400 hover:!scale-125'
+                    : '!bg-blue-500/40 !opacity-0'
+                }`}
+                style={{ left: -7 }}
+              />
+
+              {/* Column icon with glow for FK */}
+              <div className={`w-4 flex justify-center relative ${isFK ? 'fk-glow-container' : ''}`}>
+                {getColumnIcon(column)}
+                {/* Glowing indicator for FK */}
+                {isFK && !isActiveFK && (
+                  <div className={`
+                    absolute inset-0 -m-1 rounded-full
+                    ${isHoveredFK ? 'animate-ping-slow bg-blue-400/50' : 'animate-pulse-glow bg-blue-400/30'}
+                  `} />
+                )}
+                {isFK && isActiveFK && (
+                  <div className="absolute inset-0 -m-1 rounded-full bg-green-400/50 animate-pulse" />
+                )}
+              </div>
+
+              {/* Column name */}
+              <span className={`
+                flex-1 font-medium truncate transition-colors duration-200
+                ${column.isPrimaryKey ? 'text-amber-300' :
+                  isActiveFK ? 'text-green-300' :
+                  column.isForeignKey ? 'text-blue-300' : 'text-slate-200'}
+                ${isHoveredFK ? 'text-blue-200' : ''}
+              `}>
+                {column.name}
+                {!column.isNullable && <span className="text-red-400 ml-0.5">*</span>}
+              </span>
+
+              {/* FK target hint on hover */}
+              {isFK && column.references && isHoveredFK && (
+                <span className="text-[9px] text-blue-300 animate-fadeIn">
+                  → {column.references.table}
+                </span>
+              )}
+
+              {/* Column type badge */}
+              <span className={`
+                text-[10px] px-1.5 py-0.5 rounded font-mono transition-colors duration-200
+                ${column.isPrimaryKey
+                  ? 'bg-amber-500/20 text-amber-300'
+                  : isActiveFK
+                    ? 'bg-green-500/20 text-green-300'
+                    : column.isForeignKey
+                      ? 'bg-blue-500/20 text-blue-300'
+                      : 'bg-slate-700 text-slate-400'
+                }
+              `}>
+                {getTypeAbbreviation(column.type)}
+              </span>
+
+              {/* Right handle */}
+              <Handle
+                type="source"
+                position={Position.Right}
+                id={`${column.name}-right`}
+                className={`!w-3 !h-3 !border-2 !border-slate-900 transition-all duration-200 ${
+                  showHandles
+                    ? '!bg-purple-500 !opacity-100 hover:!bg-purple-400 hover:!scale-125'
+                    : '!bg-purple-500/40 !opacity-0'
+                }`}
+                style={{ right: -7 }}
+              />
             </div>
-
-            {/* Column name */}
-            <span className={`
-              flex-1 font-medium truncate
-              ${column.isPrimaryKey ? 'text-amber-300' : column.isForeignKey ? 'text-blue-300' : 'text-slate-200'}
-            `}>
-              {column.name}
-              {!column.isNullable && <span className="text-red-400 ml-0.5">*</span>}
-            </span>
-
-            {/* Column type badge */}
-            <span className={`
-              text-[10px] px-1.5 py-0.5 rounded font-mono
-              ${column.isPrimaryKey
-                ? 'bg-amber-500/20 text-amber-300'
-                : column.isForeignKey
-                  ? 'bg-blue-500/20 text-blue-300'
-                  : 'bg-slate-700 text-slate-400'
-              }
-            `}>
-              {getTypeAbbreviation(column.type)}
-            </span>
-
-            {/* Right handle */}
-            <Handle
-              type="source"
-              position={Position.Right}
-              id={`${column.name}-right`}
-              className={`!w-3 !h-3 !border-2 !border-slate-900 transition-all duration-200 ${
-                showHandles
-                  ? '!bg-purple-500 !opacity-100 hover:!bg-purple-400 hover:!scale-125'
-                  : '!bg-purple-500/40 !opacity-0'
-              }`}
-              style={{ right: -7 }}
-            />
-          </div>
-        ))}
+          );
+        })}
       </div>
 
-      {/* Footer - FK references summary */}
+      {/* Footer - Click FK hint */}
       {fkColumns.length > 0 && (
         <div className="px-3 py-2 bg-slate-800/30 rounded-b-md border-t border-slate-700/30">
-          <div className="text-[10px] text-slate-500 flex flex-wrap gap-1">
-            {fkColumns.slice(0, 3).map((c: Column) => (
-              <span
-                key={c.name}
-                className="px-1.5 py-0.5 bg-blue-500/10 text-blue-400 rounded"
-              >
-                -&gt; {c.references?.table}
-              </span>
-            ))}
-            {fkColumns.length > 3 && (
-              <span className="px-1.5 py-0.5 text-slate-500">
-                +{fkColumns.length - 3} more
-              </span>
-            )}
+          <div className="text-[10px] text-slate-500 flex items-center gap-1">
+            <span className="animate-pulse-glow inline-block w-2 h-2 rounded-full bg-blue-400/50"></span>
+            <span>Click glowing columns to reveal connections</span>
           </div>
         </div>
       )}

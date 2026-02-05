@@ -35,9 +35,9 @@ import {
   Network,
   GitBranch,
   Download,
-  Search,
+  Eye,
+  EyeOff,
   X,
-  ArrowRight,
 } from 'lucide-react';
 import type { Column } from '../../types';
 
@@ -56,8 +56,9 @@ function EdgeMarkerDefs() {
   return (
     <svg style={{ position: 'absolute', width: 0, height: 0 }}>
       <defs>
+        {/* Active relationship marker (green) */}
         <marker
-          id="arrow-default"
+          id="arrow-active"
           viewBox="0 0 10 10"
           refX="10"
           refY="5"
@@ -65,19 +66,16 @@ function EdgeMarkerDefs() {
           markerHeight="8"
           orient="auto-start-reverse"
         >
-          <path d="M 0 0 L 10 5 L 0 10 z" fill="#6366f1" />
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#10b981" />
         </marker>
-        <marker
-          id="arrow-selected"
-          viewBox="0 0 10 10"
-          refX="10"
-          refY="5"
-          markerWidth="8"
-          markerHeight="8"
-          orient="auto-start-reverse"
-        >
-          <path d="M 0 0 L 10 5 L 0 10 z" fill="#818cf8" />
-        </marker>
+        {/* Glow filter for animated dot */}
+        <filter id="glow-filter" x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation="3" result="blur" />
+          <feMerge>
+            <feMergeNode in="blur" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
       </defs>
     </svg>
   );
@@ -114,11 +112,9 @@ const ERDCanvas: React.FC = () => {
   const [showExport, setShowExport] = useState(false);
   const { fitView, screenToFlowPosition } = useReactFlow();
 
-  // Relationship filter state
-  const [filterQuery, setFilterQuery] = useState('');
-  const [showFilterDropdown, setShowFilterDropdown] = useState(false);
-  const [focusedRelationship, setFocusedRelationship] = useState<string | null>(null);
-  const filterInputRef = useRef<HTMLInputElement>(null);
+  // Active relationships - which connections are currently visible
+  const [activeRelationships, setActiveRelationships] = useState<Set<string>>(new Set());
+  const [animatingRelationship, setAnimatingRelationship] = useState<string | null>(null);
 
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{
@@ -192,72 +188,64 @@ const ERDCanvas: React.FC = () => {
     useStore.getState().setRelationships(entry.relationships);
   }, [tables, relationships]);
 
-  // Build relationship search suggestions
-  const relationshipSuggestions = useMemo(() => {
-    if (!filterQuery.trim()) return [];
-    const query = filterQuery.toLowerCase();
+  // Handle FK column click - toggle relationship visibility with animation
+  const handleFKClick = useCallback((tableId: string, columnName: string) => {
+    // Find the relationship for this FK
+    const rel = relationships.find(r =>
+      (r.sourceTable === tableId && r.sourceColumn === columnName) ||
+      (r.targetTable === tableId && r.targetColumn === columnName)
+    );
 
-    return relationships
-      .map(rel => {
-        const sourceTable = tables.find(t => t.id === rel.sourceTable);
-        const targetTable = tables.find(t => t.id === rel.targetTable);
-        if (!sourceTable || !targetTable) return null;
+    if (!rel) return;
 
-        const label = `${sourceTable.name}.${rel.sourceColumn} → ${targetTable.name}.${rel.targetColumn}`;
-        const matchScore =
-          sourceTable.name.toLowerCase().includes(query) ||
-          targetTable.name.toLowerCase().includes(query) ||
-          rel.sourceColumn.toLowerCase().includes(query) ||
-          rel.targetColumn.toLowerCase().includes(query);
+    setActiveRelationships(prev => {
+      const next = new Set(prev);
+      if (next.has(rel.id)) {
+        // Hide this relationship
+        next.delete(rel.id);
+      } else {
+        // Show with animation
+        setAnimatingRelationship(rel.id);
+        next.add(rel.id);
+        // Clear animation flag after animation completes
+        setTimeout(() => setAnimatingRelationship(null), 700);
+        // Fit view to show both tables
+        setTimeout(() => fitView({
+          padding: 0.3,
+          maxZoom: 0.9,
+          duration: 500,
+          nodes: [{ id: rel.sourceTable }, { id: rel.targetTable }]
+        }), 50);
+      }
+      return next;
+    });
+  }, [relationships, fitView]);
 
-        return matchScore ? { id: rel.id, label, rel, sourceTable, targetTable } : null;
-      })
-      .filter(Boolean)
-      .slice(0, 8) as Array<{
-        id: string;
-        label: string;
-        rel: typeof relationships[0];
-        sourceTable: typeof tables[0];
-        targetTable: typeof tables[0];
-      }>;
-  }, [filterQuery, relationships, tables]);
+  // Show all relationships
+  const handleShowAll = useCallback(() => {
+    const allIds = new Set(relationships.map(r => r.id));
+    setActiveRelationships(allIds);
+  }, [relationships]);
 
-  // Focus on a specific relationship
-  const handleFocusRelationship = useCallback((relId: string) => {
-    setFocusedRelationship(relId);
-    setFilterQuery('');
-    setShowFilterDropdown(false);
+  // Hide all relationships
+  const handleHideAll = useCallback(() => {
+    setActiveRelationships(new Set());
+  }, []);
 
-    // Find the tables involved and fit view to them
-    const rel = relationships.find(r => r.id === relId);
-    if (rel) {
-      setSelectedRelationship(relId);
-      setTimeout(() => fitView({
-        padding: 0.3,
-        maxZoom: 0.9,
-        duration: 500,
-        nodes: [{ id: rel.sourceTable }, { id: rel.targetTable }]
-      }), 100);
-    }
-  }, [relationships, fitView, setSelectedRelationship]);
-
-  // Clear focus
-  const handleClearFocus = useCallback(() => {
-    setFocusedRelationship(null);
-    setSelectedRelationship(null);
-    setTimeout(() => fitView({ padding: 0.2, maxZoom: 1, duration: 500 }), 100);
-  }, [fitView, setSelectedRelationship]);
+  // Build the set of active table-column keys for highlighting
+  const activeTableColumns = useMemo(() => {
+    const keys = new Set<string>();
+    relationships.forEach(rel => {
+      if (activeRelationships.has(rel.id)) {
+        keys.add(`${rel.sourceTable}-${rel.sourceColumn}`);
+        keys.add(`${rel.targetTable}-${rel.targetColumn}`);
+      }
+    });
+    return keys;
+  }, [relationships, activeRelationships]);
 
   // Calculate initial nodes based on layout type
   const initialNodes = useMemo(() => {
-    // Helper to check if a table is part of the focused relationship
-    const isTableDimmed = (tableId: string) => {
-      if (!focusedRelationship) return false;
-      return !relationships.some(r =>
-        r.id === focusedRelationship && (r.sourceTable === tableId || r.targetTable === tableId)
-      );
-    };
-
     if (isDemoMode && layoutType === 'force') {
       return tables.map((table) => ({
         id: table.id,
@@ -266,7 +254,8 @@ const ERDCanvas: React.FC = () => {
         data: {
           table,
           isSelected: false,
-          isDimmed: isTableDimmed(table.id),
+          activeRelationships: activeTableColumns,
+          onFKClick: handleFKClick,
         },
       }));
     }
@@ -293,24 +282,27 @@ const ERDCanvas: React.FC = () => {
         data: {
           table: nodeData.table,
           isSelected: nodeData.isSelected,
-          isDimmed: isTableDimmed(node.id),
+          activeRelationships: activeTableColumns,
+          onFKClick: handleFKClick,
         },
       };
     });
-  }, [tables, relationships, layoutType, isDemoMode, focusedRelationship]);
+  }, [tables, relationships, layoutType, isDemoMode, activeTableColumns, handleFKClick]);
 
-  // Calculate edges with custom edge type
+  // Calculate edges - only create edges for active relationships
   const initialEdges = useMemo(() => {
     const edges = createEdges(relationships, tables);
     return edges.map((edge: Edge) => ({
       ...edge,
       type: 'relationship',
       animated: false,
-      style: focusedRelationship && edge.id !== focusedRelationship
-        ? { opacity: 0.15 }
-        : undefined,
+      data: {
+        ...edge.data,
+        isActive: activeRelationships.has(edge.id),
+        isAnimating: animatingRelationship === edge.id,
+      },
     }));
-  }, [relationships, tables, focusedRelationship]);
+  }, [relationships, tables, activeRelationships, animatingRelationship]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
@@ -345,14 +337,20 @@ const ERDCanvas: React.FC = () => {
         const sourceColumn = connection.sourceHandle.replace('-right', '');
         const targetColumn = connection.targetHandle.replace('-left', '');
 
+        const newRelId = `rel-${Date.now()}`;
         addRelationship({
-          id: `rel-${Date.now()}`,
+          id: newRelId,
           sourceTable: connection.source,
           sourceColumn,
           targetTable: connection.target,
           targetColumn,
           type: 'one-to-many',
         });
+
+        // Auto-show the new relationship
+        setActiveRelationships(prev => new Set([...prev, newRelId]));
+        setAnimatingRelationship(newRelId);
+        setTimeout(() => setAnimatingRelationship(null), 700);
 
         setEdges((eds) => addEdge({
           ...connection,
@@ -386,7 +384,6 @@ const ERDCanvas: React.FC = () => {
     setSelectedTable(null);
     setSelectedRelationship(null);
     setContextMenu(null);
-    setShowFilterDropdown(false);
   }, [setSelectedTable, setSelectedRelationship]);
 
   // Handle double-click on node to rename
@@ -471,10 +468,12 @@ const ERDCanvas: React.FC = () => {
   const handleDeleteRelationship = useCallback((relId: string) => {
     removeRelationship(relId);
     setSelectedRelationship(null);
-    if (focusedRelationship === relId) {
-      setFocusedRelationship(null);
-    }
-  }, [removeRelationship, setSelectedRelationship, focusedRelationship]);
+    setActiveRelationships(prev => {
+      const next = new Set(prev);
+      next.delete(relId);
+      return next;
+    });
+  }, [removeRelationship, setSelectedRelationship]);
 
   const handleChangeRelationshipType = useCallback((relId: string, type: 'one-to-one' | 'one-to-many' | 'many-to-many') => {
     updateRelationship(relId, { type });
@@ -516,7 +515,6 @@ const ERDCanvas: React.FC = () => {
   // Re-layout with animation
   const handleLayout = useCallback((type: LayoutType) => {
     setLayoutType(type);
-    setFocusedRelationship(null);
     setTimeout(() => fitView({ padding: 0.2, maxZoom: 1, duration: 500 }), 100);
   }, [fitView]);
 
@@ -596,23 +594,15 @@ const ERDCanvas: React.FC = () => {
         }
       }
 
-      // Escape to clear focus
+      // Escape to hide all relationships
       if (e.key === 'Escape') {
-        if (focusedRelationship) {
-          handleClearFocus();
-        }
-      }
-
-      // Ctrl+F to focus search
-      if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
-        e.preventDefault();
-        filterInputRef.current?.focus();
+        handleHideAll();
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleDeleteTable, handleDeleteRelationship, handleUndo, handleRedo, focusedRelationship, handleClearFocus]);
+  }, [handleDeleteTable, handleDeleteRelationship, handleUndo, handleRedo, handleHideAll]);
 
   // Inline rename handler
   useEffect(() => {
@@ -668,15 +658,9 @@ const ERDCanvas: React.FC = () => {
     return () => clearTimeout(timer);
   }, [renamingTable, updateTable]);
 
-  // Get current focused relationship details for display
-  const focusedRelDetails = useMemo(() => {
-    if (!focusedRelationship) return null;
-    const rel = relationships.find(r => r.id === focusedRelationship);
-    if (!rel) return null;
-    const sourceTable = tables.find(t => t.id === rel.sourceTable);
-    const targetTable = tables.find(t => t.id === rel.targetTable);
-    return { rel, sourceTable, targetTable };
-  }, [focusedRelationship, relationships, tables]);
+  // Count visible relationships
+  const visibleCount = activeRelationships.size;
+  const totalCount = relationships.length;
 
   return (
     <div className="w-full h-full relative">
@@ -723,8 +707,7 @@ const ERDCanvas: React.FC = () => {
 
         <MiniMap
           nodeColor={(node) => {
-            const data = node.data as { table?: { color?: string }; isDimmed?: boolean } | undefined;
-            if (data?.isDimmed) return '#334155';
+            const data = node.data as { table?: { color?: string } } | undefined;
             return data?.table?.color || '#3b82f6';
           }}
           maskColor="rgba(15, 23, 42, 0.9)"
@@ -733,73 +716,30 @@ const ERDCanvas: React.FC = () => {
           zoomable
         />
 
-        {/* Clean Top Toolbar */}
+        {/* Top Toolbar */}
         <Panel position="top-left" className="flex items-center gap-2">
-          {/* Relationship Search */}
-          <div className="relative">
+          {/* Relationship visibility controls */}
+          {relationships.length > 0 && (
             <div className="bg-slate-800/95 backdrop-blur-sm rounded-xl shadow-xl border border-slate-700 flex items-center">
-              <Search className="w-4 h-4 text-slate-400 ml-3" />
-              <input
-                ref={filterInputRef}
-                type="text"
-                value={filterQuery}
-                onChange={(e) => {
-                  setFilterQuery(e.target.value);
-                  setShowFilterDropdown(true);
-                }}
-                onFocus={() => setShowFilterDropdown(true)}
-                placeholder="Search relationships..."
-                className="bg-transparent text-white text-sm placeholder-slate-500 px-3 py-2.5 w-48 lg:w-64 outline-none"
-              />
-              {filterQuery && (
-                <button
-                  onClick={() => {
-                    setFilterQuery('');
-                    setShowFilterDropdown(false);
-                  }}
-                  className="p-2 hover:bg-slate-700 rounded-lg mr-1"
-                >
-                  <X className="w-4 h-4 text-slate-400" />
-                </button>
-              )}
-            </div>
-
-            {/* Search Dropdown */}
-            {showFilterDropdown && relationshipSuggestions.length > 0 && (
-              <div className="absolute top-full left-0 mt-1 w-full bg-slate-800 border border-slate-700 rounded-xl shadow-2xl overflow-hidden z-50">
-                {relationshipSuggestions.map((item) => (
-                  <button
-                    key={item.id}
-                    onClick={() => handleFocusRelationship(item.id)}
-                    className="w-full px-4 py-3 text-left hover:bg-slate-700 transition-colors flex items-center gap-2"
-                  >
-                    <span className="text-sm text-white font-medium">{item.sourceTable.name}</span>
-                    <ArrowRight className="w-3 h-3 text-slate-500" />
-                    <span className="text-sm text-white font-medium">{item.targetTable.name}</span>
-                    <span className="text-xs text-slate-500 ml-auto">
-                      {item.rel.sourceColumn} → {item.rel.targetColumn}
-                    </span>
-                  </button>
-                ))}
+              <div className="px-3 py-2 border-r border-slate-700">
+                <span className="text-xs text-slate-400">Connections</span>
+                <span className="ml-2 text-sm font-medium text-white">{visibleCount}/{totalCount}</span>
               </div>
-            )}
-          </div>
-
-          {/* Focused Relationship Indicator */}
-          {focusedRelDetails && (
-            <div className="bg-blue-600/90 backdrop-blur-sm rounded-xl px-4 py-2 shadow-xl flex items-center gap-3">
-              <span className="text-sm text-white font-medium">
-                {focusedRelDetails.sourceTable?.name}.{focusedRelDetails.rel.sourceColumn}
-              </span>
-              <ArrowRight className="w-4 h-4 text-blue-200" />
-              <span className="text-sm text-white font-medium">
-                {focusedRelDetails.targetTable?.name}.{focusedRelDetails.rel.targetColumn}
-              </span>
               <button
-                onClick={handleClearFocus}
-                className="p-1 hover:bg-blue-500 rounded-lg ml-1"
+                onClick={handleShowAll}
+                className="px-3 py-2.5 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors flex items-center gap-1.5 text-sm"
+                title="Show all relationships"
               >
-                <X className="w-4 h-4 text-white" />
+                <Eye className="w-4 h-4" />
+                <span className="hidden lg:inline">Show All</span>
+              </button>
+              <button
+                onClick={handleHideAll}
+                className="px-3 py-2.5 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors flex items-center gap-1.5 text-sm rounded-r-xl"
+                title="Hide all relationships"
+              >
+                <EyeOff className="w-4 h-4" />
+                <span className="hidden lg:inline">Hide All</span>
               </button>
             </div>
           )}
@@ -842,6 +782,51 @@ const ERDCanvas: React.FC = () => {
           </div>
         </Panel>
 
+        {/* Active Relationships Pills */}
+        {activeRelationships.size > 0 && (
+          <Panel position="top-center" className="flex flex-wrap items-center gap-2 max-w-[60vw]">
+            {Array.from(activeRelationships).slice(0, 5).map(relId => {
+              const rel = relationships.find(r => r.id === relId);
+              if (!rel) return null;
+              const sourceTable = tables.find(t => t.id === rel.sourceTable);
+              const targetTable = tables.find(t => t.id === rel.targetTable);
+              if (!sourceTable || !targetTable) return null;
+
+              return (
+                <div
+                  key={relId}
+                  className="bg-emerald-600/90 backdrop-blur-sm rounded-full px-3 py-1.5 shadow-lg flex items-center gap-2 animate-fadeIn"
+                >
+                  <span className="text-xs text-white font-medium">
+                    {sourceTable.name}.{rel.sourceColumn}
+                  </span>
+                  <span className="text-emerald-200">→</span>
+                  <span className="text-xs text-white font-medium">
+                    {targetTable.name}.{rel.targetColumn}
+                  </span>
+                  <button
+                    onClick={() => {
+                      setActiveRelationships(prev => {
+                        const next = new Set(prev);
+                        next.delete(relId);
+                        return next;
+                      });
+                    }}
+                    className="p-0.5 hover:bg-emerald-500 rounded-full ml-1"
+                  >
+                    <X className="w-3 h-3 text-white" />
+                  </button>
+                </div>
+              );
+            })}
+            {activeRelationships.size > 5 && (
+              <span className="text-xs text-slate-400">
+                +{activeRelationships.size - 5} more
+              </span>
+            )}
+          </Panel>
+        )}
+
         {/* Export & Actions */}
         <Panel position="top-right" className="flex items-center gap-2">
           {tables.length > 0 && (
@@ -850,6 +835,7 @@ const ERDCanvas: React.FC = () => {
                 onClick={() => {
                   if (confirm('Clear everything and start fresh?')) {
                     reset();
+                    setActiveRelationships(new Set());
                   }
                 }}
                 className="bg-slate-800/95 backdrop-blur-sm rounded-xl px-4 py-2.5 shadow-xl border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-700 text-sm font-medium transition-all"
@@ -876,6 +862,23 @@ const ERDCanvas: React.FC = () => {
               <span className="text-slate-600 mx-2">·</span>
               <span className="text-white font-medium">{relationships.length}</span>
               <span className="text-slate-400 ml-1">relationships</span>
+            </div>
+          </Panel>
+        )}
+
+        {/* Instructions - Bottom Left */}
+        {tables.length > 0 && relationships.length > 0 && visibleCount === 0 && (
+          <Panel position="bottom-left" className="hidden lg:block">
+            <div className="bg-slate-800/80 backdrop-blur-sm rounded-xl px-4 py-3 shadow-xl border border-slate-700/50 max-w-xs">
+              <div className="flex items-start gap-3">
+                <div className="w-2 h-2 rounded-full bg-blue-400 animate-pulse mt-1.5 flex-shrink-0" />
+                <div>
+                  <p className="text-sm text-white font-medium">Click glowing columns</p>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Foreign keys glow blue. Click to reveal their connections.
+                  </p>
+                </div>
+              </div>
             </div>
           </Panel>
         )}
