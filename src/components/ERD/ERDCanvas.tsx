@@ -48,36 +48,31 @@ const edgeTypes: EdgeTypes = {
 
 type LayoutType = 'grid' | 'force' | 'hierarchical';
 
-// Custom SVG markers - purple-blue AI theme
+// Custom SVG markers for edges
 function EdgeMarkerDefs() {
   return (
     <svg style={{ position: 'absolute', width: 0, height: 0 }}>
       <defs>
-        {/* Active relationship marker (purple-blue) */}
+        {/* Cyan arrow marker for high visibility */}
         <marker
-          id="arrow-active"
+          id="arrow-cyan"
           viewBox="0 0 10 10"
           refX="10"
           refY="5"
-          markerWidth="8"
-          markerHeight="8"
+          markerWidth="6"
+          markerHeight="6"
           orient="auto-start-reverse"
         >
-          <path d="M 0 0 L 10 5 L 0 10 z" fill="#a855f7" />
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#06b6d4" />
         </marker>
         {/* Glow filter for animated effects */}
         <filter id="glow-filter" x="-50%" y="-50%" width="200%" height="200%">
-          <feGaussianBlur stdDeviation="4" result="blur" />
+          <feGaussianBlur stdDeviation="3" result="blur" />
           <feMerge>
             <feMergeNode in="blur" />
             <feMergeNode in="SourceGraphic" />
           </feMerge>
         </filter>
-        {/* Gradient for edges */}
-        <linearGradient id="edge-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
-          <stop offset="0%" stopColor="#a855f7" />
-          <stop offset="100%" stopColor="#3b82f6" />
-        </linearGradient>
       </defs>
     </svg>
   );
@@ -768,46 +763,49 @@ const ERDCanvas: React.FC<ERDCanvasProps> = ({
           zoomable
         />
 
-        {/* Minimal Top Toolbar - Just Layout */}
+        {/* Layout Toolbar */}
         <Panel position="top-left" className="flex items-center gap-2">
-          <div className="bg-slate-800/95 backdrop-blur-sm rounded-xl p-1 flex gap-0.5 shadow-xl border border-slate-700">
+          <div className="bg-slate-800/95 backdrop-blur-sm rounded-lg p-1 flex gap-1 shadow-lg border border-slate-700/80">
             <button
               onClick={() => handleLayout('grid')}
-              className={`p-2 rounded-lg transition-all ${
+              className={`px-3 py-2 rounded-md text-xs font-medium transition-all flex items-center gap-1.5 ${
                 layoutType === 'grid'
-                  ? 'bg-purple-600 text-white'
-                  : 'hover:bg-slate-700 text-slate-400 hover:text-white'
+                  ? 'bg-purple-600 text-white shadow-inner'
+                  : 'hover:bg-slate-700/80 text-slate-400 hover:text-white'
               }`}
               title="Grid Layout"
             >
-              <LayoutGrid className="w-4 h-4" />
+              <LayoutGrid className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Grid</span>
             </button>
             <button
               onClick={() => handleLayout('force')}
-              className={`p-2 rounded-lg transition-all ${
+              className={`px-3 py-2 rounded-md text-xs font-medium transition-all flex items-center gap-1.5 ${
                 layoutType === 'force'
-                  ? 'bg-purple-600 text-white'
-                  : 'hover:bg-slate-700 text-slate-400 hover:text-white'
+                  ? 'bg-purple-600 text-white shadow-inner'
+                  : 'hover:bg-slate-700/80 text-slate-400 hover:text-white'
               }`}
               title="Auto Layout"
             >
-              <Network className="w-4 h-4" />
+              <Network className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Auto</span>
             </button>
             <button
               onClick={() => handleLayout('hierarchical')}
-              className={`p-2 rounded-lg transition-all ${
+              className={`px-3 py-2 rounded-md text-xs font-medium transition-all flex items-center gap-1.5 ${
                 layoutType === 'hierarchical'
-                  ? 'bg-purple-600 text-white'
-                  : 'hover:bg-slate-700 text-slate-400 hover:text-white'
+                  ? 'bg-purple-600 text-white shadow-inner'
+                  : 'hover:bg-slate-700/80 text-slate-400 hover:text-white'
               }`}
               title="Tree Layout"
             >
-              <GitBranch className="w-4 h-4" />
+              <GitBranch className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Tree</span>
             </button>
           </div>
         </Panel>
 
-        {/* Export & Actions */}
+        {/* Actions */}
         <Panel position="top-right" className="flex items-center gap-2">
           {tables.length > 0 && (
             <>
@@ -818,15 +816,15 @@ const ERDCanvas: React.FC<ERDCanvasProps> = ({
                     setActiveRelationships(new Set());
                   }
                 }}
-                className="bg-slate-800/95 backdrop-blur-sm rounded-xl px-4 py-2.5 shadow-xl border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-700 text-sm font-medium transition-all"
+                className="bg-slate-800/95 backdrop-blur-sm rounded-lg px-3 py-2 shadow-lg border border-slate-700/80 text-slate-400 hover:text-white hover:border-red-500/50 text-xs font-medium transition-all"
               >
                 Clear
               </button>
               <button
                 onClick={() => setShowExport(true)}
-                className="bg-purple-600 hover:bg-purple-500 rounded-xl px-4 py-2.5 flex items-center gap-2 shadow-xl text-white font-medium text-sm transition-all"
+                className="bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-500 hover:to-purple-400 rounded-lg px-4 py-2 flex items-center gap-1.5 shadow-lg text-white font-medium text-xs transition-all"
               >
-                <Download className="w-4 h-4" />
+                <Download className="w-3.5 h-3.5" />
                 Export
               </button>
             </>
@@ -888,15 +886,19 @@ const ERDCanvas: React.FC<ERDCanvasProps> = ({
 
       {/* Free tier watermark */}
       {!isPremium && tables.length > 0 && (
-        <div className="absolute inset-0 pointer-events-none flex items-center justify-center z-10 overflow-hidden">
-          <div className="rotate-[-18deg] select-none opacity-[0.04]">
-            <div className="text-[100px] lg:text-[140px] font-black text-white tracking-widest whitespace-nowrap">
-              SchemaFlow
+        <div className="absolute inset-0 pointer-events-none z-10">
+          {/* Centered watermark text */}
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="rotate-[-15deg] select-none opacity-[0.03]">
+              <div className="text-[60px] sm:text-[80px] lg:text-[120px] font-black text-white tracking-[0.2em]">
+                SchemaFlow
+              </div>
             </div>
           </div>
+          {/* Remove watermark button */}
           <button
             onClick={() => setShowPremiumModal(true, 'feature')}
-            className="pointer-events-auto absolute bottom-4 right-4 px-3 py-1.5 bg-slate-800/80 backdrop-blur-sm text-slate-400 text-xs font-medium rounded-lg border border-slate-700 hover:border-slate-500 transition-all"
+            className="pointer-events-auto absolute bottom-20 lg:bottom-4 right-4 px-3 py-1.5 bg-slate-800/90 backdrop-blur-sm text-slate-400 text-xs font-medium rounded-lg border border-slate-600 hover:border-purple-500 hover:text-purple-400 transition-all"
           >
             Remove watermark
           </button>

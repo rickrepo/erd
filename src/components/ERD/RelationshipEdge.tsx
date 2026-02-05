@@ -35,7 +35,7 @@ function RelationshipEdge({
     targetY,
     sourcePosition,
     targetPosition,
-    borderRadius: 20,
+    borderRadius: 16,
   });
 
   // Animation state for the glow trail effect
@@ -47,8 +47,7 @@ function RelationshipEdge({
       setAnimationProgress(0);
       setShowFullPath(false);
 
-      // Animate the progress from 0 to 1
-      const duration = 600; // ms
+      const duration = 600;
       const startTime = Date.now();
 
       const animate = () => {
@@ -78,28 +77,44 @@ function RelationshipEdge({
     return null;
   }
 
-  const edgeColor = selected ? '#c084fc' : '#a855f7'; // Purple-blue AI theme
-  const glowColor = '#c4b5fd';
-  const strokeWidth = selected ? 4 : 3;
+  // Better colors with higher contrast
+  const edgeColor = selected ? '#22d3ee' : '#06b6d4'; // Cyan for better visibility
+  const outlineColor = '#0f172a'; // Dark outline for contrast
+  const glowColor = '#67e8f9';
+  const strokeWidth = selected ? 3 : 2.5;
 
   // Calculate stroke-dasharray for animation
-  const pathLength = 1000; // Approximate - will be clamped by SVG
+  const pathLength = 1000;
   const dashOffset = pathLength * (1 - animationProgress);
 
   return (
     <>
-      {/* Glow effect layer */}
+      {/* Dark outline for contrast against any background */}
       <BaseEdge
-        id={`${id}-glow`}
+        id={`${id}-outline`}
         path={edgePath}
         style={{
-          stroke: glowColor,
-          strokeWidth: strokeWidth + 8,
+          stroke: outlineColor,
+          strokeWidth: strokeWidth + 4,
           strokeLinecap: 'round',
-          filter: 'blur(8px)',
-          opacity: showFullPath ? 0.6 : animationProgress * 0.6,
+          opacity: showFullPath ? 1 : animationProgress,
         }}
       />
+
+      {/* Subtle glow effect */}
+      {showFullPath && (
+        <BaseEdge
+          id={`${id}-glow`}
+          path={edgePath}
+          style={{
+            stroke: glowColor,
+            strokeWidth: strokeWidth + 6,
+            strokeLinecap: 'round',
+            filter: 'blur(6px)',
+            opacity: 0.4,
+          }}
+        />
+      )}
 
       {/* Animated trail effect */}
       {isAnimating && !showFullPath && (
@@ -107,13 +122,13 @@ function RelationshipEdge({
           id={`${id}-trail`}
           path={edgePath}
           style={{
-            stroke: '#c4b5fd',
-            strokeWidth: strokeWidth + 4,
+            stroke: glowColor,
+            strokeWidth: strokeWidth + 3,
             strokeLinecap: 'round',
             strokeDasharray: pathLength,
             strokeDashoffset: dashOffset,
-            filter: 'blur(4px)',
-            opacity: 0.8,
+            filter: 'blur(3px)',
+            opacity: 0.7,
           }}
         />
       )}
@@ -131,12 +146,12 @@ function RelationshipEdge({
           strokeDashoffset: isAnimating && !showFullPath ? dashOffset : undefined,
           transition: showFullPath ? 'all 0.3s ease-out' : undefined,
         }}
-        markerEnd={showFullPath ? `url(#arrow-active)` : undefined}
+        markerEnd={showFullPath ? `url(#arrow-cyan)` : undefined}
       />
 
       {/* Animated dot traveling along the path */}
       {isAnimating && !showFullPath && (
-        <circle r="6" fill="#c4b5fd" filter="url(#glow-filter)">
+        <circle r="5" fill={glowColor} filter="url(#glow-filter)">
           <animateMotion
             dur="0.6s"
             repeatCount="1"
@@ -157,35 +172,9 @@ function RelationshipEdge({
               transition: 'opacity 0.2s ease-out',
             }}
           >
-            <div className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-purple-500 text-white shadow-lg shadow-purple-500/40">
+            <div className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-cyan-600 text-white shadow-lg border border-cyan-400/50">
               {label}
             </div>
-          </div>
-        )}
-
-        {/* Source indicator */}
-        {showFullPath && (
-          <div
-            className="nodrag nopan animate-fadeIn"
-            style={{
-              position: 'absolute',
-              transform: `translate(-50%, -50%) translate(${sourceX + (targetX > sourceX ? 20 : -20)}px,${sourceY}px)`,
-            }}
-          >
-            <div className="w-3 h-3 rounded-full bg-purple-400 shadow-lg shadow-purple-400/50 animate-pulse" />
-          </div>
-        )}
-
-        {/* Target indicator */}
-        {showFullPath && (
-          <div
-            className="nodrag nopan animate-fadeIn"
-            style={{
-              position: 'absolute',
-              transform: `translate(-50%, -50%) translate(${targetX + (sourceX > targetX ? 20 : -20)}px,${targetY}px)`,
-            }}
-          >
-            <div className="w-3 h-3 rounded-full bg-purple-400 shadow-lg shadow-purple-400/50 animate-pulse" />
           </div>
         )}
       </EdgeLabelRenderer>

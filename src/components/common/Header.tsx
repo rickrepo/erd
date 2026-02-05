@@ -42,21 +42,21 @@ export function Header() {
   };
 
   return (
-    <header className="h-14 bg-slate-800 border-b border-slate-700 flex items-center justify-between px-4 lg:px-6 flex-shrink-0">
+    <header className="h-12 bg-slate-900 border-b border-slate-700/50 flex items-center justify-between px-4 lg:px-6 flex-shrink-0">
       {/* Left: Logo */}
       <div className="flex items-center gap-4">
-        <Branding size="md" />
+        <Branding size="sm" />
       </div>
 
       {/* Right: User actions */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2">
         {/* Upgrade button for free users */}
         {subscription.tier === 'free' && (
           <button
             onClick={() => setShowPremiumModal(true, 'feature')}
-            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white text-sm font-medium rounded-lg transition-all"
+            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-500 hover:to-purple-400 text-white text-xs font-medium rounded-md transition-all shadow-sm"
           >
-            <Crown className="w-4 h-4" />
+            <Crown className="w-3.5 h-3.5" />
             Upgrade
           </button>
         )}
@@ -66,16 +66,16 @@ export function Header() {
           <div className="relative" ref={dropdownRef}>
             <button
               onClick={() => setShowDropdown(!showDropdown)}
-              className="flex items-center gap-2 px-2 py-1.5 hover:bg-slate-700 rounded-lg transition-colors"
+              className="flex items-center gap-2 px-2 py-1 hover:bg-slate-800 rounded-md transition-colors border border-transparent hover:border-slate-700"
             >
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center text-white text-sm font-medium">
+              <div className="w-7 h-7 rounded-md bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center text-white text-xs font-medium">
                 {user.name?.charAt(0).toUpperCase() || user.email.charAt(0).toUpperCase()}
               </div>
               <div className="hidden sm:block text-left">
-                <div className="text-sm text-white font-medium">{user.name || 'User'}</div>
-                <div className="text-[10px] text-slate-400">{user.email}</div>
+                <div className="text-xs text-white font-medium">{user.name || 'User'}</div>
+                <div className="text-[10px] text-slate-500">{user.email}</div>
               </div>
-              <ChevronDown className="w-4 h-4 text-slate-400" />
+              <ChevronDown className="w-3.5 h-3.5 text-slate-500" />
             </button>
 
             {showDropdown && (
@@ -133,9 +133,9 @@ export function Header() {
         ) : (
           <button
             onClick={() => setShowAuthPage(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white text-sm font-medium rounded-lg transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white text-xs font-medium rounded-md transition-colors shadow-sm"
           >
-            <LogIn className="w-4 h-4" />
+            <LogIn className="w-3.5 h-3.5" />
             <span>Sign In</span>
           </button>
         )}
