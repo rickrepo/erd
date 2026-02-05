@@ -685,33 +685,52 @@ export function createTablesFromQuery(parsed: ParsedQuery, existingTables: Table
   const existingNames = new Set(existingTables.map(t => t.name.toLowerCase()));
   const newTables: Table[] = [];
 
+  // Build a map of columns per table from both SELECT columns and JOIN conditions
+  const tableColumns = new Map<string, Set<string>>();
+
+  for (const col of parsed.columns) {
+    const key = col.table.toLowerCase();
+    if (!tableColumns.has(key)) tableColumns.set(key, new Set());
+    tableColumns.get(key)!.add(col.column);
+  }
+
+  // Add columns referenced in JOIN conditions
+  for (const join of parsed.joins) {
+    const leftKey = join.leftTable.toLowerCase();
+    const rightKey = join.rightTable.toLowerCase();
+    if (!tableColumns.has(leftKey)) tableColumns.set(leftKey, new Set());
+    if (!tableColumns.has(rightKey)) tableColumns.set(rightKey, new Set());
+    tableColumns.get(leftKey)!.add(join.leftColumn);
+    tableColumns.get(rightKey)!.add(join.rightColumn);
+  }
+
   for (const tableName of parsed.tables) {
     if (!existingNames.has(tableName.toLowerCase())) {
-      const tableColumns = parsed.columns
-        .filter(c => c.table.toLowerCase() === tableName.toLowerCase())
-        .map(c => ({
-          name: c.column,
-          type: 'VARCHAR',
-          isPrimaryKey: c.column.toLowerCase() === 'id',
-          isForeignKey: false,
-          isNullable: true
-        }));
+      const knownColumns = tableColumns.get(tableName.toLowerCase()) || new Set<string>();
+
+      const tableColumnDefs = Array.from(knownColumns).map(colName => ({
+        name: colName,
+        type: colName.toLowerCase() === 'id' ? 'INT' : 'VARCHAR',
+        isPrimaryKey: colName.toLowerCase() === 'id',
+        isForeignKey: false,
+        isNullable: true,
+      }));
 
       // Add id column if not present
-      if (!tableColumns.some(c => c.name.toLowerCase() === 'id')) {
-        tableColumns.unshift({
+      if (!tableColumnDefs.some(c => c.name.toLowerCase() === 'id')) {
+        tableColumnDefs.unshift({
           name: 'id',
           type: 'INT',
           isPrimaryKey: true,
           isForeignKey: false,
-          isNullable: false
+          isNullable: false,
         });
       }
 
       newTables.push({
         id: `table-${tableName}-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
         name: tableName,
-        columns: tableColumns,
+        columns: tableColumnDefs,
         color: getTableColor(existingTables.length + newTables.length)
       });
     }

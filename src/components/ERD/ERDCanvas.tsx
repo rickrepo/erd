@@ -16,6 +16,7 @@ import type { Connection, NodeTypes, EdgeTypes, Edge, Node } from '@xyflow/react
 import '@xyflow/react/dist/style.css';
 
 import { useStore } from '../../store/useStore';
+import { useAuthStore } from '../../store/useAuthStore';
 import { gridLayout, forceDirectedLayout, createEdges, hierarchicalLayout } from '../../utils/layout';
 import { getTableColor } from '../../utils/sqlParser';
 import { DEMO_POSITIONS } from '../../utils/demoData';
@@ -44,6 +45,7 @@ import {
   Plus,
   Undo2,
   Redo2,
+  RotateCcw,
 } from 'lucide-react';
 import type { Column } from '../../types';
 
@@ -110,7 +112,11 @@ const ERDCanvas: React.FC = () => {
     updateTable,
     selectedTable,
     isDemoMode,
+    reset,
   } = useStore();
+
+  const { subscription, setShowPremiumModal } = useAuthStore();
+  const isPremium = subscription.tier === 'pro' || subscription.tier === 'enterprise';
 
   const [layoutType, setLayoutType] = useState<LayoutType>('force');
   const [showExport, setShowExport] = useState(false);
@@ -733,6 +739,22 @@ const ERDCanvas: React.FC = () => {
               <span className="hidden sm:inline">Export</span>
             </button>
           )}
+
+          {/* Clear / Start Fresh Button */}
+          {tables.length > 0 && (
+            <button
+              onClick={() => {
+                if (confirm('Clear everything and start fresh?')) {
+                  reset();
+                }
+              }}
+              className="bg-slate-800/90 backdrop-blur-sm rounded-xl p-2 lg:p-2.5 shadow-xl border border-slate-700 hover:bg-red-600/20 hover:border-red-500/50 text-slate-400 hover:text-red-400 transition-all flex items-center gap-1.5 lg:gap-2 text-sm font-medium"
+              title="Clear & Start Fresh"
+            >
+              <RotateCcw className="w-4 h-4" />
+              <span className="hidden sm:inline">New</span>
+            </button>
+          )}
         </Panel>
 
         {/* Stats Panel */}
@@ -820,6 +842,26 @@ const ERDCanvas: React.FC = () => {
           onCreateTable={(name) => handleCreateTable(name, quickTableDialog.flowPosition)}
           onClose={() => setQuickTableDialog(null)}
         />
+      )}
+
+      {/* Free tier watermark — hidden for Pro/Enterprise */}
+      {!isPremium && tables.length > 0 && (
+        <div className="absolute inset-0 pointer-events-none flex items-center justify-center z-10 overflow-hidden">
+          <div className="rotate-[-18deg] select-none opacity-[0.06]">
+            <div className="text-[80px] lg:text-[120px] font-black text-white tracking-widest whitespace-nowrap">
+              SchemaFlow
+            </div>
+            <div className="text-center text-[18px] lg:text-[24px] font-semibold text-white tracking-[0.3em] -mt-2">
+              FREE VERSION
+            </div>
+          </div>
+          <button
+            onClick={() => setShowPremiumModal(true, 'feature')}
+            className="pointer-events-auto absolute bottom-20 lg:bottom-8 left-1/2 -translate-x-1/2 px-4 py-2 bg-gradient-to-r from-purple-600/80 to-blue-600/80 backdrop-blur-sm text-white text-xs font-medium rounded-full border border-purple-500/30 hover:border-purple-400/60 transition-all hover:scale-105 shadow-lg"
+          >
+            Upgrade to remove watermark
+          </button>
+        </div>
       )}
     </div>
   );
