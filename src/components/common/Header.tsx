@@ -1,12 +1,26 @@
 import { useState, useRef, useEffect } from 'react';
-import { LogIn, Crown, Settings, LogOut, ChevronDown } from 'lucide-react';
+import { LogIn, Crown, Settings, LogOut, ChevronDown, Play, Trash2 } from 'lucide-react';
 import { useAuthStore } from '../../store/useAuthStore';
+import { useStore } from '../../store/useStore';
 import { Branding } from './Branding';
+import { DEMO_TABLES, DEMO_RELATIONSHIPS, DEMO_SQL_QUERIES } from '../../utils/demoData';
+import { toast } from './Toast';
 
 export function Header() {
   const { user, subscription, logout, setShowAuthPage, setShowPremiumModal, isAdmin } = useAuthStore();
+  const { tables, loadDemo, reset } = useStore();
   const [showDropdown, setShowDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const handleLoadDemo = () => {
+    loadDemo(DEMO_TABLES, DEMO_RELATIONSHIPS, DEMO_SQL_QUERIES);
+    toast.success('Demo loaded!', 'E-commerce schema with sample SQL queries');
+  };
+
+  const handleClear = () => {
+    reset();
+    toast.info('Cleared', 'All tables and relationships removed');
+  };
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -50,6 +64,26 @@ export function Header() {
 
       {/* Right: User actions */}
       <div className="flex items-center gap-2">
+        {/* Load Demo / Clear buttons */}
+        {tables.length === 0 ? (
+          <button
+            onClick={handleLoadDemo}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white text-xs font-medium rounded-md transition-colors"
+          >
+            <Play className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Load Demo</span>
+            <span className="sm:hidden">Demo</span>
+          </button>
+        ) : (
+          <button
+            onClick={handleClear}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs font-medium rounded-md transition-colors"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Clear</span>
+          </button>
+        )}
+
         {/* Upgrade button for free users */}
         {subscription.tier === 'free' && (
           <button
