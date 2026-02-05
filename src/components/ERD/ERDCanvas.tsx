@@ -278,8 +278,27 @@ const ERDCanvas: React.FC<ERDCanvasProps> = ({
 
   // Store node positions separately so they don't change when data changes
   const nodePositionsRef = useRef<Map<string, { x: number; y: number }>>(new Map());
+  const userDraggedPositionsRef = useRef<Map<string, { x: number; y: number }>>(new Map());
   const prevLayoutTypeRef = useRef<LayoutType>(layoutType);
   const prevTableIdsRef = useRef<string[]>([]);
+  const prevTableCountRef = useRef(tables.length);
+
+  // Auto-fit when tables are added (not on every change)
+  useEffect(() => {
+    const currentCount = tables.length;
+    const prevCount = prevTableCountRef.current;
+
+    // Only auto-fit when tables are added (not removed or on initial load)
+    if (currentCount > prevCount && prevCount > 0) {
+      // Small delay to let the layout settle
+      const timer = setTimeout(() => {
+        fitView({ padding: 0.2, maxZoom: 1, duration: 300 });
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+
+    prevTableCountRef.current = currentCount;
+  }, [tables.length, fitView]);
 
   // Calculate positions only when layout type changes or tables are added/removed
   const nodePositions = useMemo(() => {
@@ -293,13 +312,21 @@ const ERDCanvas: React.FC<ERDCanvasProps> = ({
       prevLayoutTypeRef.current = layoutType;
       prevTableIdsRef.current = tables.map(t => t.id);
 
+      // If layout type changed, clear user-dragged positions
+      if (layoutChanged) {
+        userDraggedPositionsRef.current.clear();
+      }
+
       let newPositions: Map<string, { x: number; y: number }>;
 
       if (isDemoMode && layoutType === 'force') {
         newPositions = new Map(
           tables.map(table => [
             table.id,
-            DEMO_POSITIONS[table.id] || { x: Math.random() * 800, y: Math.random() * 600 }
+            // Preserve user-dragged position if exists
+            userDraggedPositionsRef.current.get(table.id) ||
+            DEMO_POSITIONS[table.id] ||
+            { x: Math.random() * 800, y: Math.random() * 600 }
           ])
         );
       } else {
@@ -316,7 +343,11 @@ const ERDCanvas: React.FC<ERDCanvasProps> = ({
         })();
 
         newPositions = new Map(
-          layoutNodes.map(node => [node.id, node.position])
+          layoutNodes.map(node => [
+            node.id,
+            // Preserve user-dragged position if exists
+            userDraggedPositionsRef.current.get(node.id) || node.position
+          ])
         );
       }
 
@@ -325,6 +356,12 @@ const ERDCanvas: React.FC<ERDCanvasProps> = ({
 
     return nodePositionsRef.current;
   }, [tables, relationships, layoutType, isDemoMode]);
+
+  // Track when user drags a node
+  const onNodeDragStop = useCallback((_event: React.MouseEvent, node: Node) => {
+    // Save user-dragged position
+    userDraggedPositionsRef.current.set(node.id, node.position);
+  }, []);
 
   // Calculate initial nodes - positions are stable, only data changes
   const initialNodes = useMemo(() => {
@@ -723,6 +760,7 @@ const ERDCanvas: React.FC<ERDCanvasProps> = ({
         onEdgeClick={onEdgeClick}
         onPaneClick={onPaneClick}
         onNodeDoubleClick={onNodeDoubleClick}
+        onNodeDragStop={onNodeDragStop}
         onNodeContextMenu={onNodeContextMenu}
         onEdgeContextMenu={onEdgeContextMenu}
         onPaneContextMenu={onPaneContextMenu}

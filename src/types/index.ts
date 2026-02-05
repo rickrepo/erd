@@ -82,6 +82,10 @@ export interface SavedSchema {
   relationships: Relationship[];
   createdAt: string;
   updatedAt: string;
+  // Custom positions for tables (user-dragged positions)
+  positions?: Record<string, { x: number; y: number }>;
+  // Original SQL used to create this schema
+  sourceSql?: string;
 }
 
 export type ViewMode = 'design' | 'query' | 'schema';

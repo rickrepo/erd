@@ -3,6 +3,7 @@ import { ReactFlowProvider, useReactFlow } from '@xyflow/react';
 import Sidebar from './components/Sidebar/Sidebar';
 import ERDCanvas from './components/ERD/ERDCanvas';
 import { Header } from './components/common/Header';
+import { MobileActions } from './components/common/MobileActions';
 import { WelcomeModal } from './components/common/WelcomeModal';
 import { PremiumModal } from './components/common/PremiumModal';
 import { UsageLimitModal } from './components/common/UsageLimitModal';
@@ -311,6 +312,11 @@ const AppContent: React.FC = () => {
       {/* Admin Panel */}
       {showAdminPanel && isAdmin() && (
         <AdminPanel onClose={handleCloseAdminPanel} />
+      )}
+
+      {/* Mobile Actions FAB */}
+      {isMobile && (
+        <MobileActions onShowSql={() => setMobilePanel('sidebar')} />
       )}
 
       {/* Toast Notifications */}
