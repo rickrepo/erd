@@ -398,8 +398,8 @@ export function hierarchicalLayout(
 
   // Position nodes HORIZONTALLY (left to right) with proper vertical spacing
   const nodes: Node[] = [];
-  const columnSpacing = 380; // Horizontal gap between columns
-  const minRowSpacing = 40; // Minimum vertical gap between rows in same column
+  const columnSpacing = 400; // Horizontal gap between columns
+  const minRowSpacing = 60; // Minimum vertical gap between rows in same column
 
   const sortedLevels = Array.from(levelGroups.keys()).sort((a, b) => a - b);
 

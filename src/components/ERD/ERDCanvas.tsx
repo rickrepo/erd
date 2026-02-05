@@ -18,7 +18,6 @@ import { useStore } from '../../store/useStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { gridLayout, forceDirectedLayout, createEdges, hierarchicalLayout } from '../../utils/layout';
 import { getTableColor } from '../../utils/sqlParser';
-import { DEMO_POSITIONS } from '../../utils/demoData';
 import TableNode from './TableNode';
 import RelationshipEdge from './RelationshipEdge';
 import { ExportPanel } from './ExportPanel';
@@ -110,14 +109,13 @@ const ERDCanvas: React.FC<ERDCanvasProps> = ({
     addColumn,
     updateTable,
     selectedTable,
-    isDemoMode,
     reset,
   } = useStore();
 
   const { subscription, setShowPremiumModal } = useAuthStore();
   const isPremium = subscription.tier === 'pro' || subscription.tier === 'enterprise';
 
-  const [layoutType, setLayoutType] = useState<LayoutType>('force');
+  const [layoutType, setLayoutType] = useState<LayoutType>('hierarchical');
   const [showExport, setShowExport] = useState(false);
   const { fitView, screenToFlowPosition } = useReactFlow();
 
@@ -218,8 +216,8 @@ const ERDCanvas: React.FC<ERDCanvasProps> = ({
         delay += 400 * (i + 1);
       });
     }
-    // First load with demo data - animate first few relationships
-    else if (!hasAnimatedRef.current && isDemoMode && relationships.length > 0) {
+    // First load - animate first few relationships to show how they work
+    else if (!hasAnimatedRef.current && relationships.length > 0) {
       hasAnimatedRef.current = true;
       // Animate first 3 relationships with delay
       const toAnimate = relationships.slice(0, 3);
@@ -233,7 +231,7 @@ const ERDCanvas: React.FC<ERDCanvasProps> = ({
     }
 
     prevRelCountRef.current = relationships.length;
-  }, [relationships, isDemoMode, setActiveRelationships, setAnimatingRelationship]);
+  }, [relationships, setActiveRelationships, setAnimatingRelationship]);
 
   // Handle FK column click - toggle relationship visibility with animation
   const handleFKClick = useCallback((tableId: string, columnName: string) => {
@@ -317,45 +315,32 @@ const ERDCanvas: React.FC<ERDCanvasProps> = ({
         userDraggedPositionsRef.current.clear();
       }
 
-      let newPositions: Map<string, { x: number; y: number }>;
+      // Use the selected layout algorithm
+      const layoutNodes = (() => {
+        switch (layoutType) {
+          case 'grid':
+            return gridLayout(tables);
+          case 'hierarchical':
+            return hierarchicalLayout(tables, relationships);
+          case 'force':
+          default:
+            return forceDirectedLayout(tables, relationships);
+        }
+      })();
 
-      if (isDemoMode && layoutType === 'force') {
-        newPositions = new Map(
-          tables.map(table => [
-            table.id,
-            // Preserve user-dragged position if exists
-            userDraggedPositionsRef.current.get(table.id) ||
-            DEMO_POSITIONS[table.id] ||
-            { x: Math.random() * 800, y: Math.random() * 600 }
-          ])
-        );
-      } else {
-        const layoutNodes = (() => {
-          switch (layoutType) {
-            case 'grid':
-              return gridLayout(tables);
-            case 'hierarchical':
-              return hierarchicalLayout(tables, relationships);
-            case 'force':
-            default:
-              return forceDirectedLayout(tables, relationships);
-          }
-        })();
-
-        newPositions = new Map(
-          layoutNodes.map(node => [
-            node.id,
-            // Preserve user-dragged position if exists
-            userDraggedPositionsRef.current.get(node.id) || node.position
-          ])
-        );
-      }
+      const newPositions = new Map(
+        layoutNodes.map(node => [
+          node.id,
+          // Preserve user-dragged position if exists
+          userDraggedPositionsRef.current.get(node.id) || node.position
+        ])
+      );
 
       nodePositionsRef.current = newPositions;
     }
 
     return nodePositionsRef.current;
-  }, [tables, relationships, layoutType, isDemoMode]);
+  }, [tables, relationships, layoutType]);
 
   // Track when user drags a node
   const onNodeDragStop = useCallback((_event: React.MouseEvent, node: Node) => {

@@ -197,13 +197,3 @@ FROM users u
 LEFT JOIN orders o ON u.id = o.user_id
 GROUP BY u.id, u.username
 HAVING COUNT(o.id) > 0;`;
-
-// Initial positions for demo (optimized layout)
-export const DEMO_POSITIONS: Record<string, { x: number; y: number }> = {
-  'table-users': { x: 50, y: 50 },
-  'table-addresses': { x: 50, y: 350 },
-  'table-orders': { x: 400, y: 180 },
-  'table-order_items': { x: 750, y: 180 },
-  'table-products': { x: 1100, y: 180 },
-  'table-categories': { x: 1100, y: 480 },
-};
