@@ -223,103 +223,293 @@ const ChatPanel: React.FC = () => {
   );
 };
 
-// Simple response generator
+// Enhanced response generator that actually analyzes the schema
 function generateResponse(
   input: string,
   tables: any[],
   relationships: any[]
 ): { content: string; suggestions?: string[] } {
   const lowerInput = input.toLowerCase();
+  const words = lowerInput.split(/\s+/);
 
-  if (lowerInput.includes('help') || lowerInput.includes('what can you do')) {
+  // Check if asking about a specific table
+  const matchedTable = tables.find(t =>
+    lowerInput.includes(t.name.toLowerCase()) ||
+    words.some(w => w === t.name.toLowerCase())
+  );
+
+  // Help & capabilities
+  if (lowerInput.includes('help') || lowerInput === 'what can you do' || lowerInput === '?') {
     return {
-      content: `I can help you with:
+      content: `I can analyze your database schema and help you with:
 
-1. **Analyzing your schema** - Just paste SQL queries or CREATE TABLE statements
-2. **Finding relationships** - I detect FKs and infer connections from column names
-3. **Suggesting improvements** - I can identify missing indexes or normalization issues
-4. **Explaining tables** - Ask me about any table in your diagram
+**Schema Analysis**
+- Explain any table (try: "explain users table")
+- Show column details and types
+- Identify primary/foreign keys
+
+**Relationships**
+- Show all relationships between tables
+- Find missing foreign key constraints
+- Explain how tables connect
+
+**Best Practices**
+- Check for missing primary keys
+- Find potential normalization issues
+- Suggest indexes for common patterns
+
+**SQL Generation**
+- Generate SELECT queries for tables
+- Create JOIN queries based on relationships
 
 What would you like to know?`,
-      suggestions: ['Show me the tables', 'Find missing relationships', 'Explain my schema'],
+      suggestions: tables.length > 0
+        ? ['Analyze my schema', `Explain ${tables[0]?.name}`, 'Show relationships']
+        : ['How to import SQL', 'Load demo'],
     };
   }
 
-  if (lowerInput.includes('table') && (lowerInput.includes('show') || lowerInput.includes('list'))) {
+  // Explain specific table
+  if (matchedTable && (lowerInput.includes('explain') || lowerInput.includes('describe') || lowerInput.includes('what is') || lowerInput.includes('about'))) {
+    const t = matchedTable;
+    const pk = t.columns.filter((c: any) => c.isPrimaryKey);
+    const outRels = relationships.filter((r: any) => r.sourceTable === t.id);
+    const inRels = relationships.filter((r: any) => r.targetTable === t.id);
+
+    let response = `## ${t.name}\n\n`;
+    response += `**${t.columns.length} columns** | `;
+    response += pk.length > 0 ? `PK: \`${pk.map((c: any) => c.name).join(', ')}\`` : 'No primary key';
+    response += '\n\n**Columns:**\n';
+
+    t.columns.forEach((col: any) => {
+      let badges = '';
+      if (col.isPrimaryKey) badges += ' 🔑';
+      if (col.isForeignKey) badges += ' 🔗';
+      if (!col.isNullable) badges += ' *';
+      response += `- \`${col.name}\` ${col.type}${badges}\n`;
+    });
+
+    if (outRels.length > 0 || inRels.length > 0) {
+      response += '\n**Relationships:**\n';
+      outRels.forEach((r: any) => {
+        const targetTable = tables.find((tt: any) => tt.id === r.targetTable);
+        response += `- → \`${targetTable?.name || r.targetTable}\` via ${r.sourceColumn}\n`;
+      });
+      inRels.forEach((r: any) => {
+        const sourceTable = tables.find((tt: any) => tt.id === r.sourceTable);
+        response += `- ← \`${sourceTable?.name || r.sourceTable}\` via ${r.targetColumn}\n`;
+      });
+    }
+
+    return {
+      content: response,
+      suggestions: [`Query ${t.name}`, 'Find related tables', 'Check for issues'],
+    };
+  }
+
+  // Generate SELECT query for a table
+  if (matchedTable && (lowerInput.includes('query') || lowerInput.includes('select') || lowerInput.includes('sql for'))) {
+    const t = matchedTable;
+    const cols = t.columns.slice(0, 5).map((c: any) => c.name).join(',\n  ');
+    const hasMore = t.columns.length > 5;
+
+    // Find related tables for JOIN suggestions
+    const rels = relationships.filter((r: any) => r.sourceTable === t.id || r.targetTable === t.id);
+
+    let sql = `\`\`\`sql\nSELECT\n  ${cols}${hasMore ? ',\n  -- ... more columns' : ''}\nFROM ${t.name}`;
+
+    if (rels.length > 0) {
+      const rel = rels[0];
+      const otherTableId = rel.sourceTable === t.id ? rel.targetTable : rel.sourceTable;
+      const otherTable = tables.find((tt: any) => tt.id === otherTableId);
+      if (otherTable) {
+        const joinCol = rel.sourceTable === t.id ? rel.sourceColumn : rel.targetColumn;
+        const otherCol = rel.sourceTable === t.id ? rel.targetColumn : rel.sourceColumn;
+        sql += `\nJOIN ${otherTable.name} ON ${t.name}.${joinCol} = ${otherTable.name}.${otherCol}`;
+      }
+    }
+
+    sql += '\nWHERE 1=1\nLIMIT 100;\n\`\`\`';
+
+    return {
+      content: `Here's a sample query for **${t.name}**:\n\n${sql}`,
+      suggestions: ['Add more joins', 'Explain this table', 'Show all tables'],
+    };
+  }
+
+  // List tables
+  if (lowerInput.includes('table') && (lowerInput.includes('show') || lowerInput.includes('list') || lowerInput.includes('all'))) {
     if (tables.length === 0) {
       return {
-        content: "You haven't added any tables yet. Try pasting some SQL in the sidebar!",
-        suggestions: ['Import from SQL queries', 'Create a new table'],
+        content: "No tables loaded yet.\n\n**To add tables:**\n1. Switch to the **SQL** tab\n2. Paste your SQL queries or CREATE TABLE statements\n3. Click **Parse SQL**\n\nOr try the demo to see how it works!",
+        suggestions: ['Load demo', 'How to import SQL'],
       };
     }
-    const tableList = tables.map((t) => `- **${t.name}** (${t.columns.length} columns)`).join('\n');
+
+    let response = `## Your Schema (${tables.length} tables)\n\n`;
+    tables.forEach((t: any) => {
+      const pk = t.columns.find((c: any) => c.isPrimaryKey);
+      const relCount = relationships.filter((r: any) => r.sourceTable === t.id || r.targetTable === t.id).length;
+      response += `**${t.name}** - ${t.columns.length} cols`;
+      if (pk) response += ` | PK: \`${pk.name}\``;
+      if (relCount > 0) response += ` | ${relCount} rel${relCount > 1 ? 's' : ''}`;
+      response += '\n';
+    });
+
     return {
-      content: `Here are your tables:\n\n${tableList}`,
-      suggestions: ['Show relationships', 'Find issues'],
+      content: response,
+      suggestions: tables.length > 0 ? [`Explain ${tables[0].name}`, 'Show relationships', 'Find issues'] : [],
     };
   }
 
-  if (lowerInput.includes('relationship') || lowerInput.includes('foreign key')) {
+  // Show relationships
+  if (lowerInput.includes('relationship') || lowerInput.includes('join') || lowerInput.includes('foreign key') || lowerInput.includes('connection')) {
     if (relationships.length === 0) {
+      if (tables.length === 0) {
+        return {
+          content: "No tables or relationships yet. Import your SQL to get started!",
+          suggestions: ['How to import SQL', 'Load demo'],
+        };
+      }
       return {
-        content: "No relationships detected yet. Check the **Inferences** tab for suggested relationships based on column naming patterns.",
-        suggestions: ['Show inferred relationships', 'How to add relationships'],
+        content: "No relationships detected.\n\n**To add relationships:**\n- In the ERD, hover over a column to see connection handles\n- Drag from one column's handle to another\n- Or check the **AI** tab for inferred relationships\n\n**Tip:** Columns named like `user_id` often indicate relationships!",
+        suggestions: ['Find potential relationships', 'Show tables'],
       };
     }
-    return {
-      content: `Found **${relationships.length} relationship(s)** in your schema. You can see them as connecting lines in the ERD diagram.
 
-To add new relationships:
-1. Hover over a column to see connection points
-2. Drag from one column to another
-3. The relationship will be created automatically`,
-      suggestions: ['Show all tables', 'Find issues'],
+    let response = `## Relationships (${relationships.length})\n\n`;
+    relationships.forEach((r: any) => {
+      const sourceTable = tables.find((t: any) => t.id === r.sourceTable);
+      const targetTable = tables.find((t: any) => t.id === r.targetTable);
+      const typeLabel = r.type === 'one-to-one' ? '1:1' : r.type === 'many-to-many' ? 'N:M' : '1:N';
+      response += `**${sourceTable?.name || '?'}**.${r.sourceColumn} → **${targetTable?.name || '?'}**.${r.targetColumn} (${typeLabel})\n`;
+    });
+
+    return {
+      content: response,
+      suggestions: ['Generate JOIN query', 'Find missing relationships', 'Show tables'],
     };
   }
 
-  if (lowerInput.includes('issue') || lowerInput.includes('problem') || lowerInput.includes('improve')) {
+  // Analyze/issues/problems
+  if (lowerInput.includes('analyz') || lowerInput.includes('issue') || lowerInput.includes('problem') || lowerInput.includes('check') || lowerInput.includes('improve') || lowerInput.includes('review')) {
+    if (tables.length === 0) {
+      return {
+        content: "Import your schema first, then I can analyze it for potential issues.",
+        suggestions: ['How to import SQL', 'Load demo'],
+      };
+    }
+
     const issues: string[] = [];
 
     // Check for tables without PKs
-    const noPKTables = tables.filter((t) => !t.columns.some((c: any) => c.isPrimaryKey));
-    if (noPKTables.length > 0) {
-      issues.push(`⚠️ Tables without primary keys: ${noPKTables.map((t) => t.name).join(', ')}`);
+    const noPK = tables.filter((t: any) => !t.columns.some((c: any) => c.isPrimaryKey));
+    if (noPK.length > 0) {
+      issues.push(`⚠️ **Missing primary keys:** ${noPK.map((t: any) => t.name).join(', ')}\n   Every table should have a primary key for data integrity.`);
     }
 
     // Check for potential missing FKs
-    const potentialFKs = tables.flatMap((t) =>
-      t.columns
-        .filter((c: any) => c.name.endsWith('_id') && !c.isForeignKey && !c.isPrimaryKey)
-        .map((c: any) => `${t.name}.${c.name}`)
-    );
+    const potentialFKs: string[] = [];
+    tables.forEach((t: any) => {
+      t.columns.forEach((c: any) => {
+        if ((c.name.endsWith('_id') || c.name.endsWith('Id')) && !c.isPrimaryKey && !c.isForeignKey) {
+          // Check if there's already a relationship for this column
+          const hasRel = relationships.some((r: any) =>
+            (r.sourceTable === t.id && r.sourceColumn === c.name) ||
+            (r.targetTable === t.id && r.targetColumn === c.name)
+          );
+          if (!hasRel) {
+            potentialFKs.push(`${t.name}.${c.name}`);
+          }
+        }
+      });
+    });
     if (potentialFKs.length > 0) {
-      issues.push(`🔗 Potential missing foreign keys: ${potentialFKs.join(', ')}`);
+      issues.push(`🔗 **Potential missing foreign keys:**\n   ${potentialFKs.slice(0, 5).join(', ')}${potentialFKs.length > 5 ? ` (+${potentialFKs.length - 5} more)` : ''}\n   Check the AI tab for suggested relationships.`);
+    }
+
+    // Check for tables with no relationships
+    const isolatedTables = tables.filter((t: any) =>
+      !relationships.some((r: any) => r.sourceTable === t.id || r.targetTable === t.id)
+    );
+    if (isolatedTables.length > 0 && tables.length > 1) {
+      issues.push(`📦 **Isolated tables:** ${isolatedTables.map((t: any) => t.name).join(', ')}\n   These tables have no connections to others.`);
+    }
+
+    // Check for very wide tables
+    const wideTables = tables.filter((t: any) => t.columns.length > 15);
+    if (wideTables.length > 0) {
+      issues.push(`📊 **Wide tables (>15 columns):** ${wideTables.map((t: any) => `${t.name} (${t.columns.length})`).join(', ')}\n   Consider splitting into related tables.`);
     }
 
     if (issues.length === 0) {
       return {
-        content: "✅ Your schema looks good! I didn't find any obvious issues.",
-        suggestions: ['Show tables', 'Add a new table'],
+        content: `✅ **Schema Analysis Complete**\n\nYour schema looks healthy:\n- ${tables.length} tables with proper structure\n- ${relationships.length} defined relationships\n- All tables have primary keys\n\nNo obvious issues detected!`,
+        suggestions: ['Show all tables', 'Generate queries', 'Export diagram'],
       };
     }
 
     return {
-      content: `Found some potential issues:\n\n${issues.join('\n\n')}`,
-      suggestions: ['How to fix these', 'Show all tables'],
+      content: `## Schema Analysis\n\nFound ${issues.length} potential issue${issues.length > 1 ? 's' : ''}:\n\n${issues.join('\n\n')}`,
+      suggestions: ['How to fix these', 'Show relationships', 'Check AI suggestions'],
     };
   }
 
-  // Default response
+  // Demo
+  if (lowerInput.includes('demo') || lowerInput.includes('example') || lowerInput.includes('sample')) {
+    return {
+      content: "To try the demo:\n\n1. Go to the **SQL** tab\n2. Click **Load Schema Example**\n3. Click **Parse SQL & Generate ERD**\n\nThis will load a sample e-commerce schema with users, orders, products, and more!",
+      suggestions: ['Show me the tables', 'How does this work'],
+    };
+  }
+
+  // Import help
+  if (lowerInput.includes('import') || lowerInput.includes('add') || lowerInput.includes('paste') || lowerInput.includes('how to')) {
+    return {
+      content: `**How to Import Your Schema:**
+
+1. **From SQL Queries:**
+   - Paste SELECT statements with JOINs
+   - Tables and relationships are auto-detected
+
+2. **From CREATE TABLE:**
+   - Paste your DDL statements
+   - Foreign keys become relationships
+   - Column types are preserved
+
+3. **Manually:**
+   - Right-click on the canvas to add tables
+   - Drag between columns to create relationships
+
+**Supported dialects:** MySQL, PostgreSQL, SQLite, SQL Server`,
+      suggestions: ['Load demo', 'Show tables'],
+    };
+  }
+
+  // If asking about a table that doesn't exist
+  if (words.some(w => w.length > 2 && lowerInput.includes('table'))) {
+    const possibleTable = words.find(w => w.length > 2 && !['the', 'table', 'show', 'explain', 'what', 'about'].includes(w));
+    if (possibleTable && tables.length > 0) {
+      const similar = tables.find((t: any) => t.name.toLowerCase().includes(possibleTable) || possibleTable.includes(t.name.toLowerCase()));
+      if (similar) {
+        return {
+          content: `Did you mean **${similar.name}**?`,
+          suggestions: [`Explain ${similar.name}`, `Query ${similar.name}`, 'Show all tables'],
+        };
+      }
+    }
+  }
+
+  // Default response - be helpful
+  const defaultSuggestions = tables.length > 0
+    ? ['Show tables', 'Analyze schema', 'Show relationships']
+    : ['How to import SQL', 'Load demo', 'Help'];
+
   return {
-    content: `I understand you're asking about "${input}".
-
-Currently, I can help you:
-- Analyze and visualize database schemas
-- Identify table relationships
-- Suggest improvements
-
-Try pasting some SQL queries or CREATE TABLE statements to get started!`,
-    suggestions: ['Show me an example', 'What can you do', 'Help'],
+    content: tables.length > 0
+      ? `I can help you understand your schema with ${tables.length} table${tables.length > 1 ? 's' : ''}.\n\nTry asking:\n- "Explain [table name]"\n- "Show relationships"\n- "Analyze my schema"\n- "Generate query for [table]"`
+      : `No schema loaded yet.\n\n**Quick start:**\n1. Go to the SQL tab and paste your SQL\n2. Click Parse to generate the ERD\n3. Ask me questions about your schema!\n\nOr try "load demo" to see an example.`,
+    suggestions: defaultSuggestions,
   };
 }
 

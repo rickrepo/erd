@@ -4,6 +4,7 @@ import { Download, Image, FileCode, Loader2, Check, Settings2, Crown } from 'luc
 import { useReactFlow, getNodesBounds, getViewportForBounds } from '@xyflow/react';
 import { BrandingWatermark } from '../common/Branding';
 import { useAuthStore } from '../../store/useAuthStore';
+import { useAdminStore } from '../../store/useAdminStore';
 
 interface ExportPanelProps {
   onClose: () => void;
@@ -19,7 +20,8 @@ const QUALITY_SETTINGS: Record<ExportQuality, { scale: number; label: string }> 
 };
 
 export function ExportPanel({ onClose }: ExportPanelProps) {
-  const { hasFeature, setShowPremiumModal } = useAuthStore();
+  const { hasFeature, setShowPremiumModal, user } = useAuthStore();
+  const { addActivityLog } = useAdminStore();
   const canRemoveWatermark = hasFeature('exportWithoutWatermark');
 
   const [format, setFormat] = useState<ExportFormat>('png');
@@ -137,6 +139,14 @@ export function ExportPanel({ onClose }: ExportPanelProps) {
           img.src = dataUrl;
         });
       }
+
+      // Log the export activity
+      addActivityLog({
+        userId: user?.id || 'anonymous',
+        userEmail: user?.email || 'anonymous',
+        action: 'export',
+        details: `Exported ERD as ${format.toUpperCase()} (${QUALITY_SETTINGS[quality].label})`,
+      });
 
       // Download
       const link = document.createElement('a');

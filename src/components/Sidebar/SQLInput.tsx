@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Play, Upload, FileText, AlertCircle, CheckCircle, Sparkles, ArrowRight } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { useAuthStore } from '../../store/useAuthStore';
+import { useAdminStore } from '../../store/useAdminStore';
 import {
   parseSQLQueries,
   parseCreateTableStatements,
@@ -72,7 +73,8 @@ const SQLInput: React.FC = () => {
     setIsProcessing,
   } = useStore();
 
-  const { hasFeature, setShowPremiumModal } = useAuthStore();
+  const { hasFeature, setShowPremiumModal, user } = useAuthStore();
+  const { addActivityLog } = useAdminStore();
 
   const [parseResult, setParseResult] = useState<{
     success: boolean;
@@ -133,6 +135,14 @@ const SQLInput: React.FC = () => {
           } relationship(s) extracted. ${inferred.length} potential relationship(s) inferred.`,
         });
 
+        // Log the generation activity
+        addActivityLog({
+          userId: user?.id || 'anonymous',
+          userEmail: user?.email || 'anonymous',
+          action: 'generation',
+          details: `Generated ERD from CREATE TABLE statements (${schemaTables.length} tables)`,
+        });
+
         addChatMessage({
           role: 'assistant',
           content: `I've analyzed your schema and found **${schemaTables.length} tables**: ${schemaTables
@@ -170,6 +180,14 @@ You can drag the tables around to arrange them, or use the layout buttons to aut
             success: true,
             message: `Found ${parsed.tables.length} table(s) and ${parsed.joins.length} join(s)`,
             details: `Tables: ${parsed.tables.join(', ')}`,
+          });
+
+          // Log the generation activity
+          addActivityLog({
+            userId: user?.id || 'anonymous',
+            userEmail: user?.email || 'anonymous',
+            action: 'generation',
+            details: `Generated ERD from SQL queries (${parsed.tables.length} tables, ${parsed.joins.length} joins)`,
           });
 
           addChatMessage({

@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware';
 import type { User, Subscription, UsageStats, SubscriptionFeatures } from '../types';
 import { FREE_TIER_LIMITS, PRO_TIER_FEATURES, ENTERPRISE_TIER_FEATURES } from '../types';
 import { switchUserStorage } from './useStore';
+import { useAdminStore } from './useAdminStore';
 
 // Admin accounts - in production, this would be validated server-side with hashed passwords
 const ADMIN_ACCOUNTS: Record<string, string> = {
@@ -125,6 +126,15 @@ export const useAuthStore = create<AuthStore>()(
         set({ user, subscription, showAuthPage: false });
         // Load this user's saved schema data from their scoped storage
         setTimeout(() => switchUserStorage(), 0);
+
+        // Log the login activity
+        useAdminStore.getState().addActivityLog({
+          userId: user.id,
+          userEmail: user.email,
+          action: 'login',
+          details: `User logged in${isAdminUser ? ' (admin)' : ''}`,
+        });
+
         return true;
       },
 
@@ -142,6 +152,15 @@ export const useAuthStore = create<AuthStore>()(
         set({ user, showAuthPage: false });
         // Load this user's saved schema data from their scoped storage
         setTimeout(() => switchUserStorage(), 0);
+
+        // Log the registration activity
+        useAdminStore.getState().addActivityLog({
+          userId: user.id,
+          userEmail: user.email,
+          action: 'register',
+          details: 'New user registered',
+        });
+
         return true;
       },
 
@@ -179,11 +198,23 @@ export const useAuthStore = create<AuthStore>()(
           features: PRO_TIER_FEATURES,
         };
 
+        const { user } = get();
         set({
           subscription: newSubscription,
           showPremiumModal: false,
           showUsageLimitModal: false,
         });
+
+        // Log the upgrade
+        if (user) {
+          useAdminStore.getState().addActivityLog({
+            userId: user.id,
+            userEmail: user.email,
+            action: 'upgrade',
+            details: 'Upgraded to Pro subscription',
+          });
+        }
+
         return true;
       },
 
@@ -197,11 +228,23 @@ export const useAuthStore = create<AuthStore>()(
           features: ENTERPRISE_TIER_FEATURES,
         };
 
+        const { user } = get();
         set({
           subscription: newSubscription,
           showPremiumModal: false,
           showUsageLimitModal: false,
         });
+
+        // Log the upgrade
+        if (user) {
+          useAdminStore.getState().addActivityLog({
+            userId: user.id,
+            userEmail: user.email,
+            action: 'upgrade',
+            details: 'Upgraded to Enterprise subscription',
+          });
+        }
+
         return true;
       },
 

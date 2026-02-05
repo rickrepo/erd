@@ -115,146 +115,140 @@ const Sidebar: React.FC = () => {
 
   return (
     <div className="w-full lg:w-96 h-full bg-slate-800 lg:border-r border-slate-700 flex flex-col">
-      {/* Header with Branding */}
-      <div className="p-4 border-b border-slate-700">
+      {/* Header with Branding - Simplified */}
+      <div className="p-3 border-b border-slate-700">
         <div className="flex items-center justify-between">
-          <Branding size="md" showTagline />
+          <Branding size="sm" />
 
-          {/* User Account */}
-          <div className="relative" ref={userDropdownRef}>
-            <button
-              onClick={() => setShowUserDropdown(!showUserDropdown)}
-              className="flex items-center gap-2 p-1.5 hover:bg-slate-700 rounded-lg transition-colors"
-            >
-              {user ? (
-                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-sm font-medium">
-                  {user.name?.charAt(0).toUpperCase() || user.email.charAt(0).toUpperCase()}
-                </div>
-              ) : (
-                <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center">
-                  <User className="w-4 h-4 text-slate-400" />
+          <div className="flex items-center gap-2">
+            {/* Compact SQL Dialect Selector */}
+            <div className="relative" ref={dialectDropdownRef}>
+              <button
+                onClick={() => setShowDialectDropdown(!showDialectDropdown)}
+                className="flex items-center gap-1.5 px-2 py-1.5 bg-slate-700/50 rounded-lg text-xs text-slate-300 hover:bg-slate-700 transition-colors"
+                title="SQL Dialect"
+              >
+                <Code className="w-3.5 h-3.5 text-blue-400" />
+                <span className="hidden sm:inline">{currentDialect.label.split(' ')[0]}</span>
+                <ChevronDown className={`w-3 h-3 transition-transform ${showDialectDropdown ? 'rotate-180' : ''}`} />
+              </button>
+
+              {showDialectDropdown && (
+                <div className="absolute top-full right-0 mt-1 w-40 bg-slate-700 rounded-lg shadow-xl border border-slate-600 z-50 overflow-hidden animate-slideIn">
+                  {DIALECT_OPTIONS.map((dialect) => (
+                    <button
+                      key={dialect.id}
+                      onClick={() => {
+                        setSqlDialect(dialect.id);
+                        setShowDialectDropdown(false);
+                      }}
+                      className={`w-full px-3 py-2 text-xs text-left transition-colors ${
+                        sqlDialect === dialect.id
+                          ? 'bg-blue-600 text-white'
+                          : 'text-slate-300 hover:bg-slate-600'
+                      }`}
+                    >
+                      {dialect.label}
+                    </button>
+                  ))}
                 </div>
               )}
-            </button>
+            </div>
 
-            {showUserDropdown && (
-              <div className="absolute top-full right-0 mt-1 w-56 bg-slate-700 rounded-lg shadow-xl border border-slate-600 z-50 overflow-hidden animate-slideIn">
+            {/* User Account */}
+            <div className="relative" ref={userDropdownRef}>
+              <button
+                onClick={() => setShowUserDropdown(!showUserDropdown)}
+                className="flex items-center gap-1.5 p-1 hover:bg-slate-700 rounded-lg transition-colors"
+              >
                 {user ? (
-                  <>
-                    <div className="p-3 border-b border-slate-600">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-sm font-medium text-white truncate">
-                          {user.name || user.email}
-                        </span>
-                        {getTierBadge()}
-                      </div>
-                      <p className="text-xs text-slate-400 truncate">{user.email}</p>
-                      {isAdmin() && (
-                        <div className="flex items-center gap-1 mt-1.5">
-                          <Shield className="w-3 h-3 text-red-400" />
-                          <span className="text-[10px] text-red-400 font-medium">Administrator</span>
+                  <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-xs font-medium">
+                    {user.name?.charAt(0).toUpperCase() || user.email.charAt(0).toUpperCase()}
+                  </div>
+                ) : (
+                  <div className="w-7 h-7 rounded-full bg-slate-700 flex items-center justify-center">
+                    <User className="w-3.5 h-3.5 text-slate-400" />
+                  </div>
+                )}
+              </button>
+
+              {showUserDropdown && (
+                <div className="absolute top-full right-0 mt-1 w-52 bg-slate-700 rounded-lg shadow-xl border border-slate-600 z-50 overflow-hidden animate-slideIn">
+                  {user ? (
+                    <>
+                      <div className="p-3 border-b border-slate-600">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-sm font-medium text-white truncate">
+                            {user.name || user.email.split('@')[0]}
+                          </span>
+                          {getTierBadge()}
                         </div>
+                        <p className="text-xs text-slate-400 truncate">{user.email}</p>
+                        {isAdmin() && (
+                          <div className="flex items-center gap-1 mt-1.5">
+                            <Shield className="w-3 h-3 text-red-400" />
+                            <span className="text-[10px] text-red-400 font-medium">Admin</span>
+                          </div>
+                        )}
+                      </div>
+                      {subscription.tier === 'free' && (
+                        <button
+                          onClick={() => {
+                            setShowUserDropdown(false);
+                            setShowPremiumModal(true, 'upgrade');
+                          }}
+                          className="w-full px-3 py-2 text-sm text-left text-yellow-400 hover:bg-slate-600 transition-colors flex items-center gap-2"
+                        >
+                          <Crown className="w-4 h-4" />
+                          Upgrade to Pro
+                        </button>
                       )}
-                    </div>
-                    {subscription.tier === 'free' && (
+                      {isAdmin() && (
+                        <button
+                          onClick={handleOpenAdmin}
+                          className="w-full px-3 py-2 text-sm text-left text-red-400 hover:bg-slate-600 transition-colors flex items-center gap-2"
+                        >
+                          <Shield className="w-4 h-4" />
+                          Admin Panel
+                        </button>
+                      )}
+                      <button
+                        onClick={handleLogout}
+                        className="w-full px-3 py-2 text-sm text-left text-slate-300 hover:bg-slate-600 transition-colors flex items-center gap-2"
+                      >
+                        <LogOut className="w-4 h-4" />
+                        Sign Out
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <div className="p-3 border-b border-slate-600">
+                        <p className="text-sm text-slate-300">Not signed in</p>
+                        <p className="text-[10px] text-slate-500">Sign in to save schemas</p>
+                      </div>
+                      <button
+                        onClick={handleSignIn}
+                        className="w-full px-3 py-2 text-sm text-left text-white hover:bg-slate-600 transition-colors flex items-center gap-2"
+                      >
+                        <LogIn className="w-4 h-4" />
+                        Sign In / Register
+                      </button>
                       <button
                         onClick={() => {
                           setShowUserDropdown(false);
                           setShowPremiumModal(true, 'upgrade');
                         }}
-                        className="w-full px-3 py-2.5 text-sm text-left text-yellow-400 hover:bg-slate-600 transition-colors flex items-center gap-2"
+                        className="w-full px-3 py-2 text-sm text-left text-yellow-400 hover:bg-slate-600 transition-colors flex items-center gap-2 border-t border-slate-600"
                       >
                         <Crown className="w-4 h-4" />
-                        Upgrade to Pro
+                        Get Pro
                       </button>
-                    )}
-                    {isAdmin() && (
-                      <button
-                        onClick={handleOpenAdmin}
-                        className="w-full px-3 py-2.5 text-sm text-left text-red-400 hover:bg-slate-600 transition-colors flex items-center gap-2"
-                      >
-                        <Shield className="w-4 h-4" />
-                        Admin Panel
-                      </button>
-                    )}
-                    <button
-                      onClick={handleLogout}
-                      className="w-full px-3 py-2.5 text-sm text-left text-slate-300 hover:bg-slate-600 transition-colors flex items-center gap-2"
-                    >
-                      <LogOut className="w-4 h-4" />
-                      Sign Out
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <div className="p-3 border-b border-slate-600">
-                      <p className="text-sm text-slate-300 mb-1">Not signed in</p>
-                      <p className="text-xs text-slate-500">Sign in to save your progress</p>
-                    </div>
-                    <button
-                      onClick={handleSignIn}
-                      className="w-full px-3 py-2.5 text-sm text-left text-white hover:bg-slate-600 transition-colors flex items-center gap-2"
-                    >
-                      <LogIn className="w-4 h-4" />
-                      Sign In
-                    </button>
-                    <button
-                      onClick={handleSignIn}
-                      className="w-full px-3 py-2.5 text-sm text-left text-blue-400 hover:bg-slate-600 transition-colors flex items-center gap-2"
-                    >
-                      <User className="w-4 h-4" />
-                      Create Account
-                    </button>
-                    <button
-                      onClick={() => {
-                        setShowUserDropdown(false);
-                        setShowPremiumModal(true, 'upgrade');
-                      }}
-                      className="w-full px-3 py-2.5 text-sm text-left text-yellow-400 hover:bg-slate-600 transition-colors flex items-center gap-2 border-t border-slate-600"
-                    >
-                      <Crown className="w-4 h-4" />
-                      Get Pro
-                    </button>
-                  </>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* SQL Dialect Selector */}
-        <div className="mt-4 relative" ref={dialectDropdownRef}>
-          <button
-            onClick={() => setShowDialectDropdown(!showDialectDropdown)}
-            className="w-full flex items-center justify-between px-3 py-2 bg-slate-700/50 rounded-lg text-sm text-slate-300 hover:bg-slate-700 transition-colors"
-          >
-            <span className="flex items-center gap-2">
-              <Code className="w-4 h-4 text-blue-400" />
-              {currentDialect.label}
-            </span>
-            <ChevronDown className={`w-4 h-4 transition-transform ${showDialectDropdown ? 'rotate-180' : ''}`} />
-          </button>
-
-          {showDialectDropdown && (
-            <div className="absolute top-full left-0 right-0 mt-1 bg-slate-700 rounded-lg shadow-xl border border-slate-600 z-50 overflow-hidden animate-slideIn">
-              {DIALECT_OPTIONS.map((dialect) => (
-                <button
-                  key={dialect.id}
-                  onClick={() => {
-                    setSqlDialect(dialect.id);
-                    setShowDialectDropdown(false);
-                  }}
-                  className={`w-full px-3 py-2 text-sm text-left transition-colors flex items-center gap-2 ${
-                    sqlDialect === dialect.id
-                      ? 'bg-blue-600 text-white'
-                      : 'text-slate-300 hover:bg-slate-600'
-                  }`}
-                >
-                  {dialect.label}
-                </button>
-              ))}
+                    </>
+                  )}
+                </div>
+              )}
             </div>
-          )}
+          </div>
         </div>
       </div>
 

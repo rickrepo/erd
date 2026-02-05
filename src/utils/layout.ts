@@ -12,11 +12,11 @@ interface LayoutOptions {
 
 const DEFAULT_OPTIONS: LayoutOptions = {
   spacing: {
-    horizontal: 300,
-    vertical: 200,
+    horizontal: 400,
+    vertical: 300,
   },
-  nodeWidth: 250,
-  nodeHeight: 200,
+  nodeWidth: 280,
+  nodeHeight: 250,
 };
 
 // Calculate node height based on number of columns
@@ -73,11 +73,11 @@ export function forceDirectedLayout(
 
   const nodeMap = new Map(nodes.map(n => [n.id, n]));
 
-  // Simulation parameters
-  const repulsion = 5000;
-  const attraction = 0.05;
-  const damping = 0.9;
-  const minDistance = 250;
+  // Simulation parameters - increased for better spacing
+  const repulsion = 8000;
+  const attraction = 0.04;
+  const damping = 0.85;
+  const minDistance = 350;
 
   for (let i = 0; i < iterations; i++) {
     // Apply repulsion between all nodes
@@ -297,10 +297,10 @@ export function hierarchicalLayout(
     levelGroups.get(level)!.push(table);
   }
 
-  // Position nodes
+  // Position nodes - increased spacing for better visibility
   const nodes: Node[] = [];
-  const levelSpacing = 300;
-  const nodeSpacing = 280;
+  const levelSpacing = 350;
+  const nodeSpacing = 380;
 
   for (const [level, levelTables] of levelGroups) {
     const levelWidth = levelTables.length * nodeSpacing;
