@@ -2,7 +2,6 @@ import { useCallback, useMemo, useEffect, useState, useRef } from 'react';
 import {
   ReactFlow,
   Background,
-  Controls,
   MiniMap,
   useNodesState,
   useEdgesState,
@@ -23,7 +22,6 @@ import { DEMO_POSITIONS } from '../../utils/demoData';
 import TableNode from './TableNode';
 import RelationshipEdge from './RelationshipEdge';
 import { ExportPanel } from './ExportPanel';
-import { Branding } from '../common/Branding';
 import {
   ContextMenu,
   buildTableMenuItems,
@@ -36,16 +34,10 @@ import {
   LayoutGrid,
   Network,
   GitBranch,
-  ZoomIn,
-  ZoomOut,
-  Maximize2,
   Download,
-  Sparkles,
-  Database,
-  Plus,
-  Undo2,
-  Redo2,
-  RotateCcw,
+  Search,
+  X,
+  ArrowRight,
 } from 'lucide-react';
 import type { Column } from '../../types';
 
@@ -120,7 +112,13 @@ const ERDCanvas: React.FC = () => {
 
   const [layoutType, setLayoutType] = useState<LayoutType>('force');
   const [showExport, setShowExport] = useState(false);
-  const { fitView, zoomIn, zoomOut, screenToFlowPosition } = useReactFlow();
+  const { fitView, screenToFlowPosition } = useReactFlow();
+
+  // Relationship filter state
+  const [filterQuery, setFilterQuery] = useState('');
+  const [showFilterDropdown, setShowFilterDropdown] = useState(false);
+  const [focusedRelationship, setFocusedRelationship] = useState<string | null>(null);
+  const filterInputRef = useRef<HTMLInputElement>(null);
 
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{
@@ -153,7 +151,6 @@ const ERDCanvas: React.FC = () => {
       tables: JSON.parse(JSON.stringify(tables)),
       relationships: JSON.parse(JSON.stringify(relationships)),
     });
-    // Limit history size
     if (historyRef.current.length > 50) {
       historyRef.current.shift();
     }
@@ -195,30 +192,112 @@ const ERDCanvas: React.FC = () => {
     useStore.getState().setRelationships(entry.relationships);
   }, [tables, relationships]);
 
+  // Build relationship search suggestions
+  const relationshipSuggestions = useMemo(() => {
+    if (!filterQuery.trim()) return [];
+    const query = filterQuery.toLowerCase();
+
+    return relationships
+      .map(rel => {
+        const sourceTable = tables.find(t => t.id === rel.sourceTable);
+        const targetTable = tables.find(t => t.id === rel.targetTable);
+        if (!sourceTable || !targetTable) return null;
+
+        const label = `${sourceTable.name}.${rel.sourceColumn} → ${targetTable.name}.${rel.targetColumn}`;
+        const matchScore =
+          sourceTable.name.toLowerCase().includes(query) ||
+          targetTable.name.toLowerCase().includes(query) ||
+          rel.sourceColumn.toLowerCase().includes(query) ||
+          rel.targetColumn.toLowerCase().includes(query);
+
+        return matchScore ? { id: rel.id, label, rel, sourceTable, targetTable } : null;
+      })
+      .filter(Boolean)
+      .slice(0, 8) as Array<{
+        id: string;
+        label: string;
+        rel: typeof relationships[0];
+        sourceTable: typeof tables[0];
+        targetTable: typeof tables[0];
+      }>;
+  }, [filterQuery, relationships, tables]);
+
+  // Focus on a specific relationship
+  const handleFocusRelationship = useCallback((relId: string) => {
+    setFocusedRelationship(relId);
+    setFilterQuery('');
+    setShowFilterDropdown(false);
+
+    // Find the tables involved and fit view to them
+    const rel = relationships.find(r => r.id === relId);
+    if (rel) {
+      setSelectedRelationship(relId);
+      setTimeout(() => fitView({
+        padding: 0.3,
+        maxZoom: 0.9,
+        duration: 500,
+        nodes: [{ id: rel.sourceTable }, { id: rel.targetTable }]
+      }), 100);
+    }
+  }, [relationships, fitView, setSelectedRelationship]);
+
+  // Clear focus
+  const handleClearFocus = useCallback(() => {
+    setFocusedRelationship(null);
+    setSelectedRelationship(null);
+    setTimeout(() => fitView({ padding: 0.2, maxZoom: 1, duration: 500 }), 100);
+  }, [fitView, setSelectedRelationship]);
+
   // Calculate initial nodes based on layout type
   const initialNodes = useMemo(() => {
+    // Helper to check if a table is part of the focused relationship
+    const isTableDimmed = (tableId: string) => {
+      if (!focusedRelationship) return false;
+      return !relationships.some(r =>
+        r.id === focusedRelationship && (r.sourceTable === tableId || r.targetTable === tableId)
+      );
+    };
+
     if (isDemoMode && layoutType === 'force') {
       return tables.map((table) => ({
         id: table.id,
-        type: 'tableNode',
+        type: 'tableNode' as const,
         position: DEMO_POSITIONS[table.id] || { x: Math.random() * 800, y: Math.random() * 600 },
         data: {
           table,
           isSelected: false,
+          isDimmed: isTableDimmed(table.id),
         },
       }));
     }
 
-    switch (layoutType) {
-      case 'grid':
-        return gridLayout(tables);
-      case 'hierarchical':
-        return hierarchicalLayout(tables, relationships);
-      case 'force':
-      default:
-        return forceDirectedLayout(tables, relationships);
-    }
-  }, [tables, relationships, layoutType, isDemoMode]);
+    const layoutNodes = (() => {
+      switch (layoutType) {
+        case 'grid':
+          return gridLayout(tables);
+        case 'hierarchical':
+          return hierarchicalLayout(tables, relationships);
+        case 'force':
+        default:
+          return forceDirectedLayout(tables, relationships);
+      }
+    })();
+
+    // Map layout nodes with proper typing
+    return layoutNodes.map(node => {
+      const nodeData = node.data as { table: typeof tables[0]; isSelected: boolean };
+      return {
+        id: node.id,
+        type: 'tableNode' as const,
+        position: node.position,
+        data: {
+          table: nodeData.table,
+          isSelected: nodeData.isSelected,
+          isDimmed: isTableDimmed(node.id),
+        },
+      };
+    });
+  }, [tables, relationships, layoutType, isDemoMode, focusedRelationship]);
 
   // Calculate edges with custom edge type
   const initialEdges = useMemo(() => {
@@ -227,8 +306,11 @@ const ERDCanvas: React.FC = () => {
       ...edge,
       type: 'relationship',
       animated: false,
+      style: focusedRelationship && edge.id !== focusedRelationship
+        ? { opacity: 0.15 }
+        : undefined,
     }));
-  }, [relationships, tables]);
+  }, [relationships, tables, focusedRelationship]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
@@ -304,6 +386,7 @@ const ERDCanvas: React.FC = () => {
     setSelectedTable(null);
     setSelectedRelationship(null);
     setContextMenu(null);
+    setShowFilterDropdown(false);
   }, [setSelectedTable, setSelectedRelationship]);
 
   // Handle double-click on node to rename
@@ -388,7 +471,10 @@ const ERDCanvas: React.FC = () => {
   const handleDeleteRelationship = useCallback((relId: string) => {
     removeRelationship(relId);
     setSelectedRelationship(null);
-  }, [removeRelationship, setSelectedRelationship]);
+    if (focusedRelationship === relId) {
+      setFocusedRelationship(null);
+    }
+  }, [removeRelationship, setSelectedRelationship, focusedRelationship]);
 
   const handleChangeRelationshipType = useCallback((relId: string, type: 'one-to-one' | 'one-to-many' | 'many-to-many') => {
     updateRelationship(relId, { type });
@@ -413,7 +499,6 @@ const ERDCanvas: React.FC = () => {
     };
     addTable(newTable);
 
-    // If we have a flow position, we'll set the node position after render
     if (flowPosition) {
       setTimeout(() => {
         setNodes((nds) =>
@@ -427,6 +512,13 @@ const ERDCanvas: React.FC = () => {
     setQuickTableDialog(null);
     setSelectedTable(newTable.id);
   }, [tables.length, addTable, setNodes, setSelectedTable]);
+
+  // Re-layout with animation
+  const handleLayout = useCallback((type: LayoutType) => {
+    setLayoutType(type);
+    setFocusedRelationship(null);
+    setTimeout(() => fitView({ padding: 0.2, maxZoom: 1, duration: 500 }), 100);
+  }, [fitView]);
 
   // Build context menu items
   const contextMenuItems = useMemo(() => {
@@ -462,16 +554,14 @@ const ERDCanvas: React.FC = () => {
     }
 
     return [];
-  }, [contextMenu, handleAddColumnToTable, handleDuplicateTable, handleDeleteTable, handleDeleteRelationship, handleChangeRelationshipType, handleQuickAddTable]);
+  }, [contextMenu, handleAddColumnToTable, handleDuplicateTable, handleDeleteTable, handleDeleteRelationship, handleChangeRelationshipType, handleQuickAddTable, handleLayout]);
 
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't intercept when typing in inputs
       const tag = (e.target as HTMLElement).tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
 
-      // Delete selected table or relationship
       if (e.key === 'Delete' || e.key === 'Backspace') {
         const state = useStore.getState();
         if (state.selectedTable) {
@@ -483,25 +573,21 @@ const ERDCanvas: React.FC = () => {
         }
       }
 
-      // Ctrl+Z / Cmd+Z = Undo
       if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
         e.preventDefault();
         handleUndo();
       }
 
-      // Ctrl+Shift+Z / Cmd+Shift+Z = Redo
       if ((e.ctrlKey || e.metaKey) && e.key === 'z' && e.shiftKey) {
         e.preventDefault();
         handleRedo();
       }
 
-      // Ctrl+Y = Redo
       if ((e.ctrlKey || e.metaKey) && e.key === 'y') {
         e.preventDefault();
         handleRedo();
       }
 
-      // F2 = Rename selected table
       if (e.key === 'F2') {
         const state = useStore.getState();
         if (state.selectedTable) {
@@ -509,17 +595,29 @@ const ERDCanvas: React.FC = () => {
           setRenamingTable(state.selectedTable);
         }
       }
+
+      // Escape to clear focus
+      if (e.key === 'Escape') {
+        if (focusedRelationship) {
+          handleClearFocus();
+        }
+      }
+
+      // Ctrl+F to focus search
+      if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+        e.preventDefault();
+        filterInputRef.current?.focus();
+      }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleDeleteTable, handleDeleteRelationship, handleUndo, handleRedo]);
+  }, [handleDeleteTable, handleDeleteRelationship, handleUndo, handleRedo, focusedRelationship, handleClearFocus]);
 
   // Inline rename handler
   useEffect(() => {
     if (!renamingTable) return;
 
-    // Find the node element and inject an input
     const timer = setTimeout(() => {
       const nodeEl = document.querySelector(`[data-id="${renamingTable}"]`);
       if (!nodeEl) {
@@ -570,11 +668,15 @@ const ERDCanvas: React.FC = () => {
     return () => clearTimeout(timer);
   }, [renamingTable, updateTable]);
 
-  // Re-layout with animation
-  const handleLayout = useCallback((type: LayoutType) => {
-    setLayoutType(type);
-    setTimeout(() => fitView({ padding: 0.2, maxZoom: 1, duration: 500 }), 100);
-  }, [fitView]);
+  // Get current focused relationship details for display
+  const focusedRelDetails = useMemo(() => {
+    if (!focusedRelationship) return null;
+    const rel = relationships.find(r => r.id === focusedRelationship);
+    if (!rel) return null;
+    const sourceTable = tables.find(t => t.id === rel.sourceTable);
+    const targetTable = tables.find(t => t.id === rel.targetTable);
+    return { rel, sourceTable, targetTable };
+  }, [focusedRelationship, relationships, tables]);
 
   return (
     <div className="w-full h-full relative">
@@ -619,14 +721,10 @@ const ERDCanvas: React.FC = () => {
           color="#1e293b"
         />
 
-        <Controls
-          className="!bg-slate-800/90 !border-slate-700 !rounded-xl overflow-hidden !shadow-xl"
-          showInteractive={false}
-        />
-
         <MiniMap
           nodeColor={(node) => {
-            const data = node.data as { table?: { color?: string } } | undefined;
+            const data = node.data as { table?: { color?: string }; isDimmed?: boolean } | undefined;
+            if (data?.isDimmed) return '#334155';
             return data?.table?.color || '#3b82f6';
           }}
           maskColor="rgba(15, 23, 42, 0.9)"
@@ -635,15 +733,84 @@ const ERDCanvas: React.FC = () => {
           zoomable
         />
 
-        {/* Top Toolbar */}
-        <Panel position="top-left" className="flex flex-wrap gap-1.5 lg:gap-2 max-w-[calc(100vw-1rem)]">
-          {/* Layout Controls */}
-          <div className="bg-slate-800/90 backdrop-blur-sm rounded-xl p-1 lg:p-1.5 flex gap-0.5 lg:gap-1 shadow-xl border border-slate-700">
+        {/* Clean Top Toolbar */}
+        <Panel position="top-left" className="flex items-center gap-2">
+          {/* Relationship Search */}
+          <div className="relative">
+            <div className="bg-slate-800/95 backdrop-blur-sm rounded-xl shadow-xl border border-slate-700 flex items-center">
+              <Search className="w-4 h-4 text-slate-400 ml-3" />
+              <input
+                ref={filterInputRef}
+                type="text"
+                value={filterQuery}
+                onChange={(e) => {
+                  setFilterQuery(e.target.value);
+                  setShowFilterDropdown(true);
+                }}
+                onFocus={() => setShowFilterDropdown(true)}
+                placeholder="Search relationships..."
+                className="bg-transparent text-white text-sm placeholder-slate-500 px-3 py-2.5 w-48 lg:w-64 outline-none"
+              />
+              {filterQuery && (
+                <button
+                  onClick={() => {
+                    setFilterQuery('');
+                    setShowFilterDropdown(false);
+                  }}
+                  className="p-2 hover:bg-slate-700 rounded-lg mr-1"
+                >
+                  <X className="w-4 h-4 text-slate-400" />
+                </button>
+              )}
+            </div>
+
+            {/* Search Dropdown */}
+            {showFilterDropdown && relationshipSuggestions.length > 0 && (
+              <div className="absolute top-full left-0 mt-1 w-full bg-slate-800 border border-slate-700 rounded-xl shadow-2xl overflow-hidden z-50">
+                {relationshipSuggestions.map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => handleFocusRelationship(item.id)}
+                    className="w-full px-4 py-3 text-left hover:bg-slate-700 transition-colors flex items-center gap-2"
+                  >
+                    <span className="text-sm text-white font-medium">{item.sourceTable.name}</span>
+                    <ArrowRight className="w-3 h-3 text-slate-500" />
+                    <span className="text-sm text-white font-medium">{item.targetTable.name}</span>
+                    <span className="text-xs text-slate-500 ml-auto">
+                      {item.rel.sourceColumn} → {item.rel.targetColumn}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Focused Relationship Indicator */}
+          {focusedRelDetails && (
+            <div className="bg-blue-600/90 backdrop-blur-sm rounded-xl px-4 py-2 shadow-xl flex items-center gap-3">
+              <span className="text-sm text-white font-medium">
+                {focusedRelDetails.sourceTable?.name}.{focusedRelDetails.rel.sourceColumn}
+              </span>
+              <ArrowRight className="w-4 h-4 text-blue-200" />
+              <span className="text-sm text-white font-medium">
+                {focusedRelDetails.targetTable?.name}.{focusedRelDetails.rel.targetColumn}
+              </span>
+              <button
+                onClick={handleClearFocus}
+                className="p-1 hover:bg-blue-500 rounded-lg ml-1"
+              >
+                <X className="w-4 h-4 text-white" />
+              </button>
+            </div>
+          )}
+
+          {/* Layout Buttons */}
+          <div className="bg-slate-800/95 backdrop-blur-sm rounded-xl p-1 flex gap-0.5 shadow-xl border border-slate-700">
             <button
               onClick={() => handleLayout('grid')}
-              className={`p-2 lg:p-2.5 rounded-lg transition-all ${
+              className={`p-2 rounded-lg transition-all ${
                 layoutType === 'grid'
-                  ? 'bg-blue-600 text-white shadow-lg'
+                  ? 'bg-blue-600 text-white'
                   : 'hover:bg-slate-700 text-slate-400 hover:text-white'
               }`}
               title="Grid Layout"
@@ -652,9 +819,9 @@ const ERDCanvas: React.FC = () => {
             </button>
             <button
               onClick={() => handleLayout('force')}
-              className={`p-2 lg:p-2.5 rounded-lg transition-all ${
+              className={`p-2 rounded-lg transition-all ${
                 layoutType === 'force'
-                  ? 'bg-blue-600 text-white shadow-lg'
+                  ? 'bg-blue-600 text-white'
                   : 'hover:bg-slate-700 text-slate-400 hover:text-white'
               }`}
               title="Auto Layout"
@@ -663,160 +830,69 @@ const ERDCanvas: React.FC = () => {
             </button>
             <button
               onClick={() => handleLayout('hierarchical')}
-              className={`p-2 lg:p-2.5 rounded-lg transition-all ${
+              className={`p-2 rounded-lg transition-all ${
                 layoutType === 'hierarchical'
-                  ? 'bg-blue-600 text-white shadow-lg'
+                  ? 'bg-blue-600 text-white'
                   : 'hover:bg-slate-700 text-slate-400 hover:text-white'
               }`}
               title="Tree Layout"
             >
               <GitBranch className="w-4 h-4" />
             </button>
-
-            <div className="w-px h-6 bg-slate-600 my-auto mx-0.5" />
-
-            {/* Undo/Redo */}
-            <button
-              onClick={handleUndo}
-              className="p-2 lg:p-2.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-              title="Undo (Ctrl+Z)"
-              disabled={historyRef.current.length === 0}
-            >
-              <Undo2 className="w-4 h-4" />
-            </button>
-            <button
-              onClick={handleRedo}
-              className="p-2 lg:p-2.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-              title="Redo (Ctrl+Shift+Z)"
-              disabled={futureRef.current.length === 0}
-            >
-              <Redo2 className="w-4 h-4" />
-            </button>
           </div>
+        </Panel>
 
-          {/* Zoom Controls */}
-          <div className="bg-slate-800/90 backdrop-blur-sm rounded-xl p-1 lg:p-1.5 flex gap-0.5 lg:gap-1 shadow-xl border border-slate-700">
-            <button
-              onClick={() => zoomIn({ duration: 200 })}
-              className="p-2 lg:p-2.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-all"
-              title="Zoom In"
-            >
-              <ZoomIn className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => zoomOut({ duration: 200 })}
-              className="p-2 lg:p-2.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-all"
-              title="Zoom Out"
-            >
-              <ZoomOut className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => fitView({ padding: 0.15, duration: 300 })}
-              className="p-2 lg:p-2.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-all"
-              title="Fit View"
-            >
-              <Maximize2 className="w-4 h-4" />
-            </button>
-          </div>
-
-          {/* Add Table Button */}
-          <button
-            onClick={() => handleQuickAddTable({ x: 400, y: 200 })}
-            className="bg-slate-800/90 backdrop-blur-sm rounded-xl p-2 lg:p-2.5 shadow-xl border border-slate-700 hover:bg-slate-700 text-slate-400 hover:text-white transition-all flex items-center gap-1.5 lg:gap-2 text-sm font-medium"
-            title="Add Table"
-          >
-            <Plus className="w-4 h-4" />
-            <span className="hidden sm:inline">Add Table</span>
-          </button>
-
-          {/* Export Button */}
+        {/* Export & Actions */}
+        <Panel position="top-right" className="flex items-center gap-2">
           {tables.length > 0 && (
-            <button
-              onClick={() => setShowExport(true)}
-              className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 rounded-xl p-2 lg:p-2.5 flex items-center gap-1.5 lg:gap-2 shadow-xl text-white font-medium text-sm transition-all hover:scale-105"
-            >
-              <Download className="w-4 h-4" />
-              <span className="hidden sm:inline">Export</span>
-            </button>
-          )}
-
-          {/* Clear / Start Fresh Button */}
-          {tables.length > 0 && (
-            <button
-              onClick={() => {
-                if (confirm('Clear everything and start fresh?')) {
-                  reset();
-                }
-              }}
-              className="bg-slate-800/90 backdrop-blur-sm rounded-xl p-2 lg:p-2.5 shadow-xl border border-slate-700 hover:bg-red-600/20 hover:border-red-500/50 text-slate-400 hover:text-red-400 transition-all flex items-center gap-1.5 lg:gap-2 text-sm font-medium"
-              title="Clear & Start Fresh"
-            >
-              <RotateCcw className="w-4 h-4" />
-              <span className="hidden sm:inline">New</span>
-            </button>
+            <>
+              <button
+                onClick={() => {
+                  if (confirm('Clear everything and start fresh?')) {
+                    reset();
+                  }
+                }}
+                className="bg-slate-800/95 backdrop-blur-sm rounded-xl px-4 py-2.5 shadow-xl border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-700 text-sm font-medium transition-all"
+              >
+                Clear
+              </button>
+              <button
+                onClick={() => setShowExport(true)}
+                className="bg-blue-600 hover:bg-blue-500 rounded-xl px-4 py-2.5 flex items-center gap-2 shadow-xl text-white font-medium text-sm transition-all"
+              >
+                <Download className="w-4 h-4" />
+                Export
+              </button>
+            </>
           )}
         </Panel>
 
-        {/* Stats Panel */}
-        <Panel position="top-right" className="hidden sm:block">
-          <div className="bg-slate-800/90 backdrop-blur-sm rounded-xl px-4 py-2.5 shadow-xl border border-slate-700 flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <Database className="w-4 h-4 text-blue-400" />
-              <span className="text-sm font-medium text-white">{tables.length}</span>
-              <span className="text-xs text-slate-400">tables</span>
+        {/* Stats - Bottom Right */}
+        {tables.length > 0 && (
+          <Panel position="bottom-right" className="hidden lg:block">
+            <div className="bg-slate-800/80 backdrop-blur-sm rounded-xl px-4 py-2 shadow-xl border border-slate-700/50 text-sm">
+              <span className="text-white font-medium">{tables.length}</span>
+              <span className="text-slate-400 ml-1">tables</span>
+              <span className="text-slate-600 mx-2">·</span>
+              <span className="text-white font-medium">{relationships.length}</span>
+              <span className="text-slate-400 ml-1">relationships</span>
             </div>
-            <div className="w-px h-4 bg-slate-600" />
-            <div className="flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-purple-400" />
-              <span className="text-sm font-medium text-white">{relationships.length}</span>
-              <span className="text-xs text-slate-400">relations</span>
-            </div>
-          </div>
-        </Panel>
-
-        {/* Keyboard shortcuts hint — desktop only */}
-        <Panel position="bottom-right" className="hidden lg:block">
-          <div className="bg-slate-800/70 backdrop-blur-sm rounded-xl px-3 py-2 shadow-xl border border-slate-700/50 text-[10px] text-slate-500 space-y-0.5">
-            <div><kbd className="text-slate-400">Right-click</kbd> for options</div>
-            <div><kbd className="text-slate-400">Del</kbd> remove selected</div>
-            <div><kbd className="text-slate-400">F2</kbd> rename table</div>
-            <div><kbd className="text-slate-400">Ctrl+Z</kbd> undo</div>
-          </div>
-        </Panel>
-
-        {/* Branding — desktop only */}
-        <Panel position="bottom-left" className="hidden lg:block">
-          <div className="bg-slate-800/80 backdrop-blur-sm rounded-xl p-2 shadow-xl border border-slate-700/50">
-            <Branding size="sm" />
-          </div>
-        </Panel>
+          </Panel>
+        )}
 
         {/* Empty State */}
         {tables.length === 0 && (
-          <Panel position="top-center" className="!top-1/2 !-translate-y-1/2 !left-1/2 !-translate-x-1/2 !w-[calc(100%-2rem)] sm:!w-auto">
-            <div className="text-center max-w-md mx-auto animate-fadeIn px-4">
-              <div className="w-16 h-16 lg:w-24 lg:h-24 rounded-2xl bg-gradient-to-br from-blue-600/20 to-purple-600/20 flex items-center justify-center mx-auto mb-4 lg:mb-6 border border-slate-700">
-                <Database className="w-8 h-8 lg:w-12 lg:h-12 text-blue-400" />
-              </div>
-              <h3 className="text-xl lg:text-2xl font-bold text-white mb-2 lg:mb-3">Ready to Design</h3>
-              <p className="text-sm lg:text-base text-slate-400 mb-4 lg:mb-6 leading-relaxed">
-                <span className="hidden sm:inline">Paste SQL queries or CREATE TABLE statements in the sidebar, or right-click here to add tables directly.</span>
-                <span className="sm:hidden">Switch to the SQL tab to paste your schema, or tap below to add a table.</span>
+          <Panel position="top-center" className="!top-1/2 !-translate-y-1/2 !left-1/2 !-translate-x-1/2">
+            <div className="text-center max-w-md mx-auto animate-fadeIn">
+              <h3 className="text-2xl font-bold text-white mb-3">No Tables Yet</h3>
+              <p className="text-slate-400 mb-6">
+                Paste SQL in the sidebar or right-click to add tables manually.
               </p>
-              <div className="hidden sm:flex flex-wrap items-center justify-center gap-2 text-sm text-slate-500">
-                <span className="px-2 py-1 bg-slate-800 rounded-lg border border-slate-700">Drag</span>
-                <span>to move</span>
-                <span className="px-2 py-1 bg-slate-800 rounded-lg border border-slate-700">Connect</span>
-                <span>handles to link</span>
-                <span className="px-2 py-1 bg-slate-800 rounded-lg border border-slate-700">Scroll</span>
-                <span>to zoom</span>
-              </div>
               <button
                 onClick={() => handleQuickAddTable({ x: window.innerWidth / 2, y: window.innerHeight / 2 })}
-                className="mt-4 lg:mt-6 px-5 py-2.5 lg:px-6 lg:py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-medium flex items-center gap-2 mx-auto transition-all text-sm lg:text-base"
+                className="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-medium transition-all"
               >
-                <Plus className="w-4 h-4" />
-                Add Your First Table
+                Add First Table
               </button>
             </div>
           </Panel>
@@ -844,22 +920,19 @@ const ERDCanvas: React.FC = () => {
         />
       )}
 
-      {/* Free tier watermark — hidden for Pro/Enterprise */}
+      {/* Free tier watermark */}
       {!isPremium && tables.length > 0 && (
         <div className="absolute inset-0 pointer-events-none flex items-center justify-center z-10 overflow-hidden">
-          <div className="rotate-[-18deg] select-none opacity-[0.06]">
-            <div className="text-[80px] lg:text-[120px] font-black text-white tracking-widest whitespace-nowrap">
+          <div className="rotate-[-18deg] select-none opacity-[0.04]">
+            <div className="text-[100px] lg:text-[140px] font-black text-white tracking-widest whitespace-nowrap">
               SchemaFlow
-            </div>
-            <div className="text-center text-[18px] lg:text-[24px] font-semibold text-white tracking-[0.3em] -mt-2">
-              FREE VERSION
             </div>
           </div>
           <button
             onClick={() => setShowPremiumModal(true, 'feature')}
-            className="pointer-events-auto absolute bottom-20 lg:bottom-8 left-1/2 -translate-x-1/2 px-4 py-2 bg-gradient-to-r from-purple-600/80 to-blue-600/80 backdrop-blur-sm text-white text-xs font-medium rounded-full border border-purple-500/30 hover:border-purple-400/60 transition-all hover:scale-105 shadow-lg"
+            className="pointer-events-auto absolute bottom-4 right-4 px-3 py-1.5 bg-slate-800/80 backdrop-blur-sm text-slate-400 text-xs font-medium rounded-lg border border-slate-700 hover:border-slate-500 transition-all"
           >
-            Upgrade to remove watermark
+            Remove watermark
           </button>
         </div>
       )}

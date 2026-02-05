@@ -1,21 +1,22 @@
 import { memo, useState } from 'react';
 import { Handle, Position } from '@xyflow/react';
 import type { NodeProps } from '@xyflow/react';
-import { Key, Link, Circle } from 'lucide-react';
+import { Key, Link } from 'lucide-react';
 import type { Table, Column } from '../../types';
 
 interface TableNodeData {
   table: Table;
   isSelected: boolean;
+  isDimmed?: boolean;
   onColumnClick?: (column: Column) => void;
   onEditTable?: () => void;
   isExporting?: boolean;
 }
 
-// Industry standard: Show all columns without truncation
+// Professional ERD table node - shows all columns
 function TableNode({ data, selected }: NodeProps) {
   const nodeData = data as unknown as TableNodeData;
-  const { table, onColumnClick, isExporting } = nodeData;
+  const { table, onColumnClick, isExporting, isDimmed } = nodeData;
   const isSelected = selected || nodeData.isSelected;
   const [isHovered, setIsHovered] = useState(false);
 
@@ -29,7 +30,7 @@ function TableNode({ data, selected }: NodeProps) {
     if (column.isForeignKey) {
       return <Link className="w-3 h-3 text-blue-400 flex-shrink-0" />;
     }
-    return <Circle className="w-2 h-2 text-slate-500 flex-shrink-0" />;
+    return null;
   };
 
   const getTypeAbbreviation = (type: string) => {
@@ -56,6 +57,7 @@ function TableNode({ data, selected }: NodeProps) {
           : 'hover:shadow-3xl'
         }
         ${isExporting ? '' : 'hover:scale-[1.01]'}
+        ${isDimmed ? 'opacity-30 pointer-events-none' : ''}
       `}
       style={{
         boxShadow: isSelected
