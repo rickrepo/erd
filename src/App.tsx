@@ -1,8 +1,7 @@
 import { useEffect, useCallback, useState } from 'react';
-import { ReactFlowProvider } from '@xyflow/react';
+import { ReactFlowProvider, useReactFlow } from '@xyflow/react';
 import Sidebar from './components/Sidebar/Sidebar';
 import ERDCanvas from './components/ERD/ERDCanvas';
-import ChatPanel from './components/Chat/ChatPanel';
 import { WelcomeModal } from './components/common/WelcomeModal';
 import { PremiumModal } from './components/common/PremiumModal';
 import { UsageLimitModal } from './components/common/UsageLimitModal';
@@ -13,12 +12,13 @@ import { useStore } from './store/useStore';
 import { useAuthStore } from './store/useAuthStore';
 import { useAdminStore } from './store/useAdminStore';
 import { DEMO_TABLES, DEMO_RELATIONSHIPS, DEMO_SQL_QUERIES } from './utils/demoData';
-import { Code, GitBranch, FileCode } from 'lucide-react';
+import { Code, GitBranch, Link } from 'lucide-react';
 
-type MobilePanel = 'sidebar' | 'canvas' | 'chat';
+type MobilePanel = 'sidebar' | 'canvas';
 
-const App: React.FC = () => {
-  const { showWelcome, setShowWelcome, loadDemo, reset, tables } = useStore();
+// Inner component that has access to ReactFlow context
+const AppContent: React.FC = () => {
+  const { showWelcome, setShowWelcome, loadDemo, reset, tables, relationships } = useStore();
   const {
     showPremiumModal,
     showUsageLimitModal,
@@ -32,6 +32,12 @@ const App: React.FC = () => {
 
   const [mobilePanel, setMobilePanel] = useState<MobilePanel>('canvas');
   const [isMobile, setIsMobile] = useState(false);
+
+  // Active relationships state - lifted to App for sharing between Sidebar and Canvas
+  const [activeRelationships, setActiveRelationships] = useState<Set<string>>(new Set());
+  const [animatingRelationship, setAnimatingRelationship] = useState<string | null>(null);
+
+  const { fitView } = useReactFlow();
 
   // Detect mobile viewport
   useEffect(() => {
@@ -117,6 +123,71 @@ const App: React.FC = () => {
     setShowAuthPage,
   ]);
 
+  // Sidebar handlers for relationship visibility
+  const handleToggleRelationship = useCallback((relId: string) => {
+    setActiveRelationships(prev => {
+      const next = new Set(prev);
+      if (next.has(relId)) {
+        next.delete(relId);
+      } else {
+        setAnimatingRelationship(relId);
+        next.add(relId);
+        setTimeout(() => setAnimatingRelationship(null), 700);
+
+        // Find the relationship and fit view to it
+        const rel = relationships.find(r => r.id === relId);
+        if (rel) {
+          setTimeout(() => fitView({
+            padding: 0.3,
+            maxZoom: 0.9,
+            duration: 500,
+            nodes: [{ id: rel.sourceTable }, { id: rel.targetTable }]
+          }), 50);
+        }
+      }
+      return next;
+    });
+  }, [relationships, fitView]);
+
+  const handleShowAll = useCallback(() => {
+    const allIds = new Set(relationships.map(r => r.id));
+    setActiveRelationships(allIds);
+  }, [relationships]);
+
+  const handleHideAll = useCallback(() => {
+    setActiveRelationships(new Set());
+  }, []);
+
+  // Animate chain of relationships
+  const handleAnimateChain = useCallback((startRelId: string) => {
+    const chain: string[] = [startRelId];
+    const startRel = relationships.find(r => r.id === startRelId);
+    if (!startRel) return;
+
+    // Find relationships that start from the target table
+    let currentTargetTable = startRel.targetTable;
+    const visited = new Set([startRelId]);
+
+    while (true) {
+      const nextRel = relationships.find(r =>
+        r.sourceTable === currentTargetTable && !visited.has(r.id)
+      );
+      if (!nextRel) break;
+      chain.push(nextRel.id);
+      visited.add(nextRel.id);
+      currentTargetTable = nextRel.targetTable;
+    }
+
+    // Animate each relationship in sequence
+    chain.forEach((relId, i) => {
+      setTimeout(() => {
+        setAnimatingRelationship(relId);
+        setActiveRelationships(prev => new Set([...prev, relId]));
+        setTimeout(() => setAnimatingRelationship(null), 500);
+      }, i * 400);
+    });
+  }, [relationships]);
+
   // Show auth page if requested
   if (showAuthPage) {
     return (
@@ -128,100 +199,124 @@ const App: React.FC = () => {
   }
 
   const mobileTabs: { id: MobilePanel; label: string; icon: typeof Code; badge?: number }[] = [
-    { id: 'sidebar', label: 'SQL', icon: Code },
+    { id: 'sidebar', label: 'Joins', icon: Link, badge: relationships.length },
     { id: 'canvas', label: 'ERD', icon: GitBranch, badge: tables.length },
-    { id: 'chat', label: 'Report', icon: FileCode },
   ];
 
   return (
+    <div className="w-full h-screen flex flex-col lg:flex-row bg-slate-900 overflow-hidden">
+      {/* Desktop layout */}
+      {!isMobile && (
+        <>
+          <Sidebar
+            activeRelationships={activeRelationships}
+            onToggleRelationship={handleToggleRelationship}
+            onShowAll={handleShowAll}
+            onHideAll={handleHideAll}
+            onAnimateChain={handleAnimateChain}
+          />
+          <div className="flex-1 relative">
+            <ERDCanvas
+              activeRelationships={activeRelationships}
+              setActiveRelationships={setActiveRelationships}
+              animatingRelationship={animatingRelationship}
+              setAnimatingRelationship={setAnimatingRelationship}
+            />
+          </div>
+        </>
+      )}
+
+      {/* Mobile layout */}
+      {isMobile && (
+        <>
+          <div className="flex-1 overflow-hidden relative">
+            <div className={mobilePanel === 'sidebar' ? 'h-full' : 'hidden'}>
+              <Sidebar
+                activeRelationships={activeRelationships}
+                onToggleRelationship={handleToggleRelationship}
+                onShowAll={handleShowAll}
+                onHideAll={handleHideAll}
+                onAnimateChain={handleAnimateChain}
+              />
+            </div>
+            <div className={mobilePanel === 'canvas' ? 'h-full' : 'hidden'}>
+              <ERDCanvas
+                activeRelationships={activeRelationships}
+                setActiveRelationships={setActiveRelationships}
+                animatingRelationship={animatingRelationship}
+                setAnimatingRelationship={setAnimatingRelationship}
+              />
+            </div>
+          </div>
+
+          {/* Mobile bottom navigation */}
+          <div className="flex-shrink-0 bg-slate-800 border-t border-slate-700 safe-area-bottom">
+            <div className="flex">
+              {mobileTabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setMobilePanel(tab.id)}
+                  className={`flex-1 flex flex-col items-center gap-0.5 py-2.5 px-2 transition-colors relative ${
+                    mobilePanel === tab.id
+                      ? 'text-purple-400'
+                      : 'text-slate-500 active:text-slate-300'
+                  }`}
+                >
+                  <tab.icon className="w-5 h-5" />
+                  <span className="text-[10px] font-medium">{tab.label}</span>
+                  {tab.badge !== undefined && tab.badge > 0 && (
+                    <span className="absolute top-1.5 right-1/2 translate-x-4 px-1 min-w-[16px] h-4 text-[9px] font-bold bg-purple-500 text-white rounded-full flex items-center justify-center">
+                      {tab.badge}
+                    </span>
+                  )}
+                  {mobilePanel === tab.id && (
+                    <div className="absolute top-0 left-4 right-4 h-0.5 bg-purple-500 rounded-full" />
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Welcome Modal */}
+      {showWelcome && (
+        <WelcomeModal
+          onClose={handleStartFresh}
+          onLoadDemo={handleLoadDemo}
+          onStartFresh={handleStartFresh}
+        />
+      )}
+
+      {/* Premium Modal */}
+      {showPremiumModal && (
+        <PremiumModal onClose={handleClosePremiumModal} />
+      )}
+
+      {/* Usage Limit Modal */}
+      {showUsageLimitModal && (
+        <UsageLimitModal
+          onClose={handleCloseUsageLimitModal}
+          onUpgrade={handleUpgradeFromLimit}
+        />
+      )}
+
+      {/* Admin Panel */}
+      {showAdminPanel && isAdmin() && (
+        <AdminPanel onClose={handleCloseAdminPanel} />
+      )}
+
+      {/* Toast Notifications */}
+      <ToastContainer />
+    </div>
+  );
+};
+
+// Wrapper that provides ReactFlowProvider
+const App: React.FC = () => {
+  return (
     <ReactFlowProvider>
-      <div className="w-full h-screen flex flex-col lg:flex-row bg-slate-900 overflow-hidden">
-        {/* Desktop layout: all panels visible */}
-        {!isMobile && (
-          <>
-            <Sidebar />
-            <div className="flex-1 relative">
-              <ERDCanvas />
-            </div>
-            <ChatPanel />
-          </>
-        )}
-
-        {/* Mobile layout: one panel at a time + bottom nav */}
-        {isMobile && (
-          <>
-            <div className="flex-1 overflow-hidden relative">
-              <div className={mobilePanel === 'sidebar' ? 'h-full' : 'hidden'}>
-                <Sidebar />
-              </div>
-              <div className={mobilePanel === 'canvas' ? 'h-full' : 'hidden'}>
-                <ERDCanvas />
-              </div>
-              <div className={mobilePanel === 'chat' ? 'h-full' : 'hidden'}>
-                <ChatPanel />
-              </div>
-            </div>
-
-            {/* Mobile bottom navigation */}
-            <div className="flex-shrink-0 bg-slate-800 border-t border-slate-700 safe-area-bottom">
-              <div className="flex">
-                {mobileTabs.map((tab) => (
-                  <button
-                    key={tab.id}
-                    onClick={() => setMobilePanel(tab.id)}
-                    className={`flex-1 flex flex-col items-center gap-0.5 py-2.5 px-2 transition-colors relative ${
-                      mobilePanel === tab.id
-                        ? 'text-blue-400'
-                        : 'text-slate-500 active:text-slate-300'
-                    }`}
-                  >
-                    <tab.icon className="w-5 h-5" />
-                    <span className="text-[10px] font-medium">{tab.label}</span>
-                    {tab.badge !== undefined && tab.badge > 0 && (
-                      <span className="absolute top-1.5 right-1/2 translate-x-4 px-1 min-w-[16px] h-4 text-[9px] font-bold bg-blue-500 text-white rounded-full flex items-center justify-center">
-                        {tab.badge}
-                      </span>
-                    )}
-                    {mobilePanel === tab.id && (
-                      <div className="absolute top-0 left-4 right-4 h-0.5 bg-blue-500 rounded-full" />
-                    )}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </>
-        )}
-
-        {/* Welcome Modal */}
-        {showWelcome && (
-          <WelcomeModal
-            onClose={handleStartFresh}
-            onLoadDemo={handleLoadDemo}
-            onStartFresh={handleStartFresh}
-          />
-        )}
-
-        {/* Premium Modal */}
-        {showPremiumModal && (
-          <PremiumModal onClose={handleClosePremiumModal} />
-        )}
-
-        {/* Usage Limit Modal */}
-        {showUsageLimitModal && (
-          <UsageLimitModal
-            onClose={handleCloseUsageLimitModal}
-            onUpgrade={handleUpgradeFromLimit}
-          />
-        )}
-
-        {/* Admin Panel - Only show if user is admin */}
-        {showAdminPanel && isAdmin() && (
-          <AdminPanel onClose={handleCloseAdminPanel} />
-        )}
-
-        {/* Toast Notifications */}
-        <ToastContainer />
-      </div>
+      <AppContent />
     </ReactFlowProvider>
   );
 };

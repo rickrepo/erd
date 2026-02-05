@@ -35,9 +35,6 @@ import {
   Network,
   GitBranch,
   Download,
-  Eye,
-  EyeOff,
-  X,
 } from 'lucide-react';
 import type { Column } from '../../types';
 
@@ -51,12 +48,12 @@ const edgeTypes: EdgeTypes = {
 
 type LayoutType = 'grid' | 'force' | 'hierarchical';
 
-// Custom SVG markers for relationship arrows
+// Custom SVG markers - purple-blue AI theme
 function EdgeMarkerDefs() {
   return (
     <svg style={{ position: 'absolute', width: 0, height: 0 }}>
       <defs>
-        {/* Active relationship marker (green) */}
+        {/* Active relationship marker (purple-blue) */}
         <marker
           id="arrow-active"
           viewBox="0 0 10 10"
@@ -66,16 +63,21 @@ function EdgeMarkerDefs() {
           markerHeight="8"
           orient="auto-start-reverse"
         >
-          <path d="M 0 0 L 10 5 L 0 10 z" fill="#10b981" />
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#a855f7" />
         </marker>
-        {/* Glow filter for animated dot */}
+        {/* Glow filter for animated effects */}
         <filter id="glow-filter" x="-50%" y="-50%" width="200%" height="200%">
-          <feGaussianBlur stdDeviation="3" result="blur" />
+          <feGaussianBlur stdDeviation="4" result="blur" />
           <feMerge>
             <feMergeNode in="blur" />
             <feMergeNode in="SourceGraphic" />
           </feMerge>
         </filter>
+        {/* Gradient for edges */}
+        <linearGradient id="edge-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stopColor="#a855f7" />
+          <stop offset="100%" stopColor="#3b82f6" />
+        </linearGradient>
       </defs>
     </svg>
   );
@@ -87,7 +89,19 @@ interface HistoryEntry {
   relationships: ReturnType<typeof useStore.getState>['relationships'];
 }
 
-const ERDCanvas: React.FC = () => {
+export interface ERDCanvasProps {
+  activeRelationships: Set<string>;
+  setActiveRelationships: React.Dispatch<React.SetStateAction<Set<string>>>;
+  animatingRelationship: string | null;
+  setAnimatingRelationship: React.Dispatch<React.SetStateAction<string | null>>;
+}
+
+const ERDCanvas: React.FC<ERDCanvasProps> = ({
+  activeRelationships,
+  setActiveRelationships,
+  animatingRelationship,
+  setAnimatingRelationship,
+}) => {
   const {
     tables,
     relationships,
@@ -112,9 +126,9 @@ const ERDCanvas: React.FC = () => {
   const [showExport, setShowExport] = useState(false);
   const { fitView, screenToFlowPosition } = useReactFlow();
 
-  // Active relationships - which connections are currently visible
-  const [activeRelationships, setActiveRelationships] = useState<Set<string>>(new Set());
-  const [animatingRelationship, setAnimatingRelationship] = useState<string | null>(null);
+  // Track if we've done the initial animation
+  const hasAnimatedRef = useRef(false);
+  const prevRelCountRef = useRef(relationships.length);
 
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{
@@ -188,6 +202,44 @@ const ERDCanvas: React.FC = () => {
     useStore.getState().setRelationships(entry.relationships);
   }, [tables, relationships]);
 
+  // Auto-animate relationships on first load or when new relationships are added
+  useEffect(() => {
+    if (relationships.length === 0) {
+      hasAnimatedRef.current = false;
+      return;
+    }
+
+    // New relationships were added
+    if (relationships.length > prevRelCountRef.current) {
+      // Animate the new relationships one by one
+      const newRels = relationships.slice(prevRelCountRef.current);
+      let delay = 0;
+      newRels.forEach((rel, i) => {
+        setTimeout(() => {
+          setAnimatingRelationship(rel.id);
+          setActiveRelationships(prev => new Set([...prev, rel.id]));
+          setTimeout(() => setAnimatingRelationship(null), 600);
+        }, delay);
+        delay += 400 * (i + 1);
+      });
+    }
+    // First load with demo data - animate first few relationships
+    else if (!hasAnimatedRef.current && isDemoMode && relationships.length > 0) {
+      hasAnimatedRef.current = true;
+      // Animate first 3 relationships with delay
+      const toAnimate = relationships.slice(0, 3);
+      toAnimate.forEach((rel, i) => {
+        setTimeout(() => {
+          setAnimatingRelationship(rel.id);
+          setActiveRelationships(prev => new Set([...prev, rel.id]));
+          setTimeout(() => setAnimatingRelationship(null), 600);
+        }, 500 + i * 500);
+      });
+    }
+
+    prevRelCountRef.current = relationships.length;
+  }, [relationships, isDemoMode, setActiveRelationships, setAnimatingRelationship]);
+
   // Handle FK column click - toggle relationship visibility with animation
   const handleFKClick = useCallback((tableId: string, columnName: string) => {
     // Find the relationship for this FK
@@ -201,15 +253,11 @@ const ERDCanvas: React.FC = () => {
     setActiveRelationships(prev => {
       const next = new Set(prev);
       if (next.has(rel.id)) {
-        // Hide this relationship
         next.delete(rel.id);
       } else {
-        // Show with animation
         setAnimatingRelationship(rel.id);
         next.add(rel.id);
-        // Clear animation flag after animation completes
         setTimeout(() => setAnimatingRelationship(null), 700);
-        // Fit view to show both tables
         setTimeout(() => fitView({
           padding: 0.3,
           maxZoom: 0.9,
@@ -219,18 +267,7 @@ const ERDCanvas: React.FC = () => {
       }
       return next;
     });
-  }, [relationships, fitView]);
-
-  // Show all relationships
-  const handleShowAll = useCallback(() => {
-    const allIds = new Set(relationships.map(r => r.id));
-    setActiveRelationships(allIds);
-  }, [relationships]);
-
-  // Hide all relationships
-  const handleHideAll = useCallback(() => {
-    setActiveRelationships(new Set());
-  }, []);
+  }, [relationships, fitView, setActiveRelationships, setAnimatingRelationship]);
 
   // Build the set of active table-column keys for highlighting
   const activeTableColumns = useMemo(() => {
@@ -272,7 +309,6 @@ const ERDCanvas: React.FC = () => {
       }
     })();
 
-    // Map layout nodes with proper typing
     return layoutNodes.map(node => {
       const nodeData = node.data as { table: typeof tables[0]; isSelected: boolean };
       return {
@@ -289,7 +325,7 @@ const ERDCanvas: React.FC = () => {
     });
   }, [tables, relationships, layoutType, isDemoMode, activeTableColumns, handleFKClick]);
 
-  // Calculate edges - only create edges for active relationships
+  // Calculate edges
   const initialEdges = useMemo(() => {
     const edges = createEdges(relationships, tables);
     return edges.map((edge: Edge) => ({
@@ -347,7 +383,6 @@ const ERDCanvas: React.FC = () => {
           type: 'one-to-many',
         });
 
-        // Auto-show the new relationship
         setActiveRelationships(prev => new Set([...prev, newRelId]));
         setAnimatingRelationship(newRelId);
         setTimeout(() => setAnimatingRelationship(null), 700);
@@ -358,7 +393,7 @@ const ERDCanvas: React.FC = () => {
         }, eds));
       }
     },
-    [addRelationship, setEdges]
+    [addRelationship, setEdges, setActiveRelationships, setAnimatingRelationship]
   );
 
   // Handle node selection
@@ -473,7 +508,7 @@ const ERDCanvas: React.FC = () => {
       next.delete(relId);
       return next;
     });
-  }, [removeRelationship, setSelectedRelationship]);
+  }, [removeRelationship, setSelectedRelationship, setActiveRelationships]);
 
   const handleChangeRelationshipType = useCallback((relId: string, type: 'one-to-one' | 'one-to-many' | 'many-to-many') => {
     updateRelationship(relId, { type });
@@ -594,15 +629,15 @@ const ERDCanvas: React.FC = () => {
         }
       }
 
-      // Escape to hide all relationships
+      // Escape to hide all
       if (e.key === 'Escape') {
-        handleHideAll();
+        setActiveRelationships(new Set());
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleDeleteTable, handleDeleteRelationship, handleUndo, handleRedo, handleHideAll]);
+  }, [handleDeleteTable, handleDeleteRelationship, handleUndo, handleRedo, setActiveRelationships]);
 
   // Inline rename handler
   useEffect(() => {
@@ -658,10 +693,6 @@ const ERDCanvas: React.FC = () => {
     return () => clearTimeout(timer);
   }, [renamingTable, updateTable]);
 
-  // Count visible relationships
-  const visibleCount = activeRelationships.size;
-  const totalCount = relationships.length;
-
   return (
     <div className="w-full h-full relative">
       <EdgeMarkerDefs />
@@ -695,7 +726,7 @@ const ERDCanvas: React.FC = () => {
         deleteKeyCode={null}
         selectionKeyCode={null}
         multiSelectionKeyCode="Shift"
-        connectionLineStyle={{ stroke: '#6366f1', strokeWidth: 2 }}
+        connectionLineStyle={{ stroke: '#a855f7', strokeWidth: 2 }}
         connectionLineType={ConnectionLineType.SmoothStep}
       >
         <Background
@@ -716,41 +747,14 @@ const ERDCanvas: React.FC = () => {
           zoomable
         />
 
-        {/* Top Toolbar */}
+        {/* Minimal Top Toolbar - Just Layout */}
         <Panel position="top-left" className="flex items-center gap-2">
-          {/* Relationship visibility controls */}
-          {relationships.length > 0 && (
-            <div className="bg-slate-800/95 backdrop-blur-sm rounded-xl shadow-xl border border-slate-700 flex items-center">
-              <div className="px-3 py-2 border-r border-slate-700">
-                <span className="text-xs text-slate-400">Connections</span>
-                <span className="ml-2 text-sm font-medium text-white">{visibleCount}/{totalCount}</span>
-              </div>
-              <button
-                onClick={handleShowAll}
-                className="px-3 py-2.5 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors flex items-center gap-1.5 text-sm"
-                title="Show all relationships"
-              >
-                <Eye className="w-4 h-4" />
-                <span className="hidden lg:inline">Show All</span>
-              </button>
-              <button
-                onClick={handleHideAll}
-                className="px-3 py-2.5 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors flex items-center gap-1.5 text-sm rounded-r-xl"
-                title="Hide all relationships"
-              >
-                <EyeOff className="w-4 h-4" />
-                <span className="hidden lg:inline">Hide All</span>
-              </button>
-            </div>
-          )}
-
-          {/* Layout Buttons */}
           <div className="bg-slate-800/95 backdrop-blur-sm rounded-xl p-1 flex gap-0.5 shadow-xl border border-slate-700">
             <button
               onClick={() => handleLayout('grid')}
               className={`p-2 rounded-lg transition-all ${
                 layoutType === 'grid'
-                  ? 'bg-blue-600 text-white'
+                  ? 'bg-purple-600 text-white'
                   : 'hover:bg-slate-700 text-slate-400 hover:text-white'
               }`}
               title="Grid Layout"
@@ -761,7 +765,7 @@ const ERDCanvas: React.FC = () => {
               onClick={() => handleLayout('force')}
               className={`p-2 rounded-lg transition-all ${
                 layoutType === 'force'
-                  ? 'bg-blue-600 text-white'
+                  ? 'bg-purple-600 text-white'
                   : 'hover:bg-slate-700 text-slate-400 hover:text-white'
               }`}
               title="Auto Layout"
@@ -772,7 +776,7 @@ const ERDCanvas: React.FC = () => {
               onClick={() => handleLayout('hierarchical')}
               className={`p-2 rounded-lg transition-all ${
                 layoutType === 'hierarchical'
-                  ? 'bg-blue-600 text-white'
+                  ? 'bg-purple-600 text-white'
                   : 'hover:bg-slate-700 text-slate-400 hover:text-white'
               }`}
               title="Tree Layout"
@@ -781,51 +785,6 @@ const ERDCanvas: React.FC = () => {
             </button>
           </div>
         </Panel>
-
-        {/* Active Relationships Pills */}
-        {activeRelationships.size > 0 && (
-          <Panel position="top-center" className="flex flex-wrap items-center gap-2 max-w-[60vw]">
-            {Array.from(activeRelationships).slice(0, 5).map(relId => {
-              const rel = relationships.find(r => r.id === relId);
-              if (!rel) return null;
-              const sourceTable = tables.find(t => t.id === rel.sourceTable);
-              const targetTable = tables.find(t => t.id === rel.targetTable);
-              if (!sourceTable || !targetTable) return null;
-
-              return (
-                <div
-                  key={relId}
-                  className="bg-emerald-600/90 backdrop-blur-sm rounded-full px-3 py-1.5 shadow-lg flex items-center gap-2 animate-fadeIn"
-                >
-                  <span className="text-xs text-white font-medium">
-                    {sourceTable.name}.{rel.sourceColumn}
-                  </span>
-                  <span className="text-emerald-200">→</span>
-                  <span className="text-xs text-white font-medium">
-                    {targetTable.name}.{rel.targetColumn}
-                  </span>
-                  <button
-                    onClick={() => {
-                      setActiveRelationships(prev => {
-                        const next = new Set(prev);
-                        next.delete(relId);
-                        return next;
-                      });
-                    }}
-                    className="p-0.5 hover:bg-emerald-500 rounded-full ml-1"
-                  >
-                    <X className="w-3 h-3 text-white" />
-                  </button>
-                </div>
-              );
-            })}
-            {activeRelationships.size > 5 && (
-              <span className="text-xs text-slate-400">
-                +{activeRelationships.size - 5} more
-              </span>
-            )}
-          </Panel>
-        )}
 
         {/* Export & Actions */}
         <Panel position="top-right" className="flex items-center gap-2">
@@ -844,7 +803,7 @@ const ERDCanvas: React.FC = () => {
               </button>
               <button
                 onClick={() => setShowExport(true)}
-                className="bg-blue-600 hover:bg-blue-500 rounded-xl px-4 py-2.5 flex items-center gap-2 shadow-xl text-white font-medium text-sm transition-all"
+                className="bg-purple-600 hover:bg-purple-500 rounded-xl px-4 py-2.5 flex items-center gap-2 shadow-xl text-white font-medium text-sm transition-all"
               >
                 <Download className="w-4 h-4" />
                 Export
@@ -861,24 +820,7 @@ const ERDCanvas: React.FC = () => {
               <span className="text-slate-400 ml-1">tables</span>
               <span className="text-slate-600 mx-2">·</span>
               <span className="text-white font-medium">{relationships.length}</span>
-              <span className="text-slate-400 ml-1">relationships</span>
-            </div>
-          </Panel>
-        )}
-
-        {/* Instructions - Bottom Left */}
-        {tables.length > 0 && relationships.length > 0 && visibleCount === 0 && (
-          <Panel position="bottom-left" className="hidden lg:block">
-            <div className="bg-slate-800/80 backdrop-blur-sm rounded-xl px-4 py-3 shadow-xl border border-slate-700/50 max-w-xs">
-              <div className="flex items-start gap-3">
-                <div className="w-2 h-2 rounded-full bg-blue-400 animate-pulse mt-1.5 flex-shrink-0" />
-                <div>
-                  <p className="text-sm text-white font-medium">Click glowing columns</p>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    Foreign keys glow blue. Click to reveal their connections.
-                  </p>
-                </div>
-              </div>
+              <span className="text-slate-400 ml-1">joins</span>
             </div>
           </Panel>
         )}
@@ -893,7 +835,7 @@ const ERDCanvas: React.FC = () => {
               </p>
               <button
                 onClick={() => handleQuickAddTable({ x: window.innerWidth / 2, y: window.innerHeight / 2 })}
-                className="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-medium transition-all"
+                className="px-6 py-3 bg-purple-600 hover:bg-purple-500 text-white rounded-xl font-medium transition-all"
               >
                 Add First Table
               </button>

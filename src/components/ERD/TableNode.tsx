@@ -150,18 +150,20 @@ function TableNode({ data, selected }: NodeProps) {
                 style={{ left: -7 }}
               />
 
-              {/* Column icon with glow for FK */}
+              {/* Column icon with glow for FK - purple-blue AI feel */}
               <div className={`w-4 flex justify-center relative ${isFK ? 'fk-glow-container' : ''}`}>
                 {getColumnIcon(column)}
-                {/* Glowing indicator for FK */}
+                {/* Glowing indicator for FK - purple-blue gradient */}
                 {isFK && !isActiveFK && (
                   <div className={`
-                    absolute inset-0 -m-1 rounded-full
-                    ${isHoveredFK ? 'animate-ping-slow bg-blue-400/50' : 'animate-pulse-glow bg-blue-400/30'}
+                    absolute inset-0 -m-1.5 rounded-full
+                    ${isHoveredFK
+                      ? 'animate-ping-slow bg-gradient-to-r from-purple-400/60 to-blue-400/60'
+                      : 'animate-pulse-glow bg-gradient-to-r from-purple-500/40 to-blue-500/40'}
                   `} />
                 )}
                 {isFK && isActiveFK && (
-                  <div className="absolute inset-0 -m-1 rounded-full bg-green-400/50 animate-pulse" />
+                  <div className="absolute inset-0 -m-1.5 rounded-full bg-gradient-to-r from-purple-400/60 to-cyan-400/60 animate-pulse" />
                 )}
               </div>
 
