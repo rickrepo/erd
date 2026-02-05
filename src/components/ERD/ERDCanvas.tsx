@@ -281,49 +281,70 @@ const ERDCanvas: React.FC<ERDCanvasProps> = ({
     return keys;
   }, [relationships, activeRelationships]);
 
-  // Calculate initial nodes based on layout type
-  const initialNodes = useMemo(() => {
-    if (isDemoMode && layoutType === 'force') {
-      return tables.map((table) => ({
-        id: table.id,
-        type: 'tableNode' as const,
-        position: DEMO_POSITIONS[table.id] || { x: Math.random() * 800, y: Math.random() * 600 },
-        data: {
-          table,
-          isSelected: false,
-          activeRelationships: activeTableColumns,
-          onFKClick: handleFKClick,
-        },
-      }));
+  // Store node positions separately so they don't change when data changes
+  const nodePositionsRef = useRef<Map<string, { x: number; y: number }>>(new Map());
+  const prevLayoutTypeRef = useRef<LayoutType>(layoutType);
+  const prevTableIdsRef = useRef<string[]>([]);
+
+  // Calculate positions only when layout type changes or tables are added/removed
+  const nodePositions = useMemo(() => {
+    const currentTableIds = tables.map(t => t.id).sort().join(',');
+    const prevTableIds = prevTableIdsRef.current.sort().join(',');
+    const layoutChanged = prevLayoutTypeRef.current !== layoutType;
+    const tablesChanged = currentTableIds !== prevTableIds;
+
+    // Only recalculate positions if layout type changed or tables changed
+    if (layoutChanged || tablesChanged || nodePositionsRef.current.size === 0) {
+      prevLayoutTypeRef.current = layoutType;
+      prevTableIdsRef.current = tables.map(t => t.id);
+
+      let newPositions: Map<string, { x: number; y: number }>;
+
+      if (isDemoMode && layoutType === 'force') {
+        newPositions = new Map(
+          tables.map(table => [
+            table.id,
+            DEMO_POSITIONS[table.id] || { x: Math.random() * 800, y: Math.random() * 600 }
+          ])
+        );
+      } else {
+        const layoutNodes = (() => {
+          switch (layoutType) {
+            case 'grid':
+              return gridLayout(tables);
+            case 'hierarchical':
+              return hierarchicalLayout(tables, relationships);
+            case 'force':
+            default:
+              return forceDirectedLayout(tables, relationships);
+          }
+        })();
+
+        newPositions = new Map(
+          layoutNodes.map(node => [node.id, node.position])
+        );
+      }
+
+      nodePositionsRef.current = newPositions;
     }
 
-    const layoutNodes = (() => {
-      switch (layoutType) {
-        case 'grid':
-          return gridLayout(tables);
-        case 'hierarchical':
-          return hierarchicalLayout(tables, relationships);
-        case 'force':
-        default:
-          return forceDirectedLayout(tables, relationships);
-      }
-    })();
+    return nodePositionsRef.current;
+  }, [tables, relationships, layoutType, isDemoMode]);
 
-    return layoutNodes.map(node => {
-      const nodeData = node.data as { table: typeof tables[0]; isSelected: boolean };
-      return {
-        id: node.id,
-        type: 'tableNode' as const,
-        position: node.position,
-        data: {
-          table: nodeData.table,
-          isSelected: nodeData.isSelected,
-          activeRelationships: activeTableColumns,
-          onFKClick: handleFKClick,
-        },
-      };
-    });
-  }, [tables, relationships, layoutType, isDemoMode, activeTableColumns, handleFKClick]);
+  // Calculate initial nodes - positions are stable, only data changes
+  const initialNodes = useMemo(() => {
+    return tables.map((table) => ({
+      id: table.id,
+      type: 'tableNode' as const,
+      position: nodePositions.get(table.id) || { x: Math.random() * 800, y: Math.random() * 600 },
+      data: {
+        table,
+        isSelected: false,
+        activeRelationships: activeTableColumns,
+        onFKClick: handleFKClick,
+      },
+    }));
+  }, [tables, nodePositions, activeTableColumns, handleFKClick]);
 
   // Calculate edges
   const initialEdges = useMemo(() => {
@@ -812,9 +833,9 @@ const ERDCanvas: React.FC<ERDCanvasProps> = ({
           )}
         </Panel>
 
-        {/* Stats - Bottom Right */}
+        {/* Stats - Bottom Left, above minimap */}
         {tables.length > 0 && (
-          <Panel position="bottom-right" className="hidden lg:block">
+          <Panel position="bottom-left" className="hidden lg:block !mb-[140px]">
             <div className="bg-slate-800/80 backdrop-blur-sm rounded-xl px-4 py-2 shadow-xl border border-slate-700/50 text-sm">
               <span className="text-white font-medium">{tables.length}</span>
               <span className="text-slate-400 ml-1">tables</span>
@@ -824,25 +845,25 @@ const ERDCanvas: React.FC<ERDCanvasProps> = ({
             </div>
           </Panel>
         )}
-
-        {/* Empty State */}
-        {tables.length === 0 && (
-          <Panel position="top-center" className="!top-1/2 !-translate-y-1/2 !left-1/2 !-translate-x-1/2">
-            <div className="text-center max-w-md mx-auto animate-fadeIn">
-              <h3 className="text-2xl font-bold text-white mb-3">No Tables Yet</h3>
-              <p className="text-slate-400 mb-6">
-                Paste SQL in the sidebar or right-click to add tables manually.
-              </p>
-              <button
-                onClick={() => handleQuickAddTable({ x: window.innerWidth / 2, y: window.innerHeight / 2 })}
-                className="px-6 py-3 bg-purple-600 hover:bg-purple-500 text-white rounded-xl font-medium transition-all"
-              >
-                Add First Table
-              </button>
-            </div>
-          </Panel>
-        )}
       </ReactFlow>
+
+      {/* Empty State - Centered Overlay */}
+      {tables.length === 0 && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
+          <div className="text-center max-w-md mx-auto animate-fadeIn pointer-events-auto">
+            <h3 className="text-2xl font-bold text-white mb-3">No Tables Yet</h3>
+            <p className="text-slate-400 mb-6">
+              Paste SQL in the sidebar or right-click anywhere to add tables manually.
+            </p>
+            <button
+              onClick={() => handleQuickAddTable({ x: window.innerWidth / 2, y: window.innerHeight / 2 })}
+              className="px-6 py-3 bg-purple-600 hover:bg-purple-500 text-white rounded-xl font-medium transition-all"
+            >
+              Add First Table
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Export Panel */}
       {showExport && <ExportPanel onClose={() => setShowExport(false)} />}
