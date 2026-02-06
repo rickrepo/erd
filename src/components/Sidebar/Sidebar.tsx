@@ -108,18 +108,31 @@ function extractQueryName(sql: string): string {
 
 type SidebarTab = 'sql' | 'joins';
 
-// SQL syntax highlighting
+// SQL syntax highlighting using markers to avoid regex conflicts
 const highlightSQL = (sql: string): React.ReactNode => {
-  const keywords = /\b(SELECT|FROM|WHERE|JOIN|INNER|LEFT|RIGHT|OUTER|FULL|ON|AND|OR|AS|ORDER|BY|GROUP|HAVING|LIMIT|OFFSET|UNION|DISTINCT|INSERT|UPDATE|DELETE|CREATE|ALTER|DROP|TABLE|VIEW|INDEX|PRIMARY|FOREIGN|KEY|REFERENCES|CONSTRAINT|DEFAULT|NOT|NULL|IN|BETWEEN|LIKE|EXISTS|CASE|WHEN|THEN|ELSE|END|SET|VALUES|INTO|WITH|PROCEDURE|FUNCTION|TRIGGER|SERIAL|INT|INTEGER|VARCHAR|CHAR|TEXT|BOOLEAN|BOOL|DATE|DATETIME|TIMESTAMP|DECIMAL|FLOAT|DOUBLE|NUMERIC|BIGINT|SMALLINT|AUTO_INCREMENT|IDENTITY|UNIQUE|CHECK)\b/gi;
-  const strings = /('[^']*')/g;
-  const comments = /(--[^\n]*)/g;
-  const numbers = /\b(\d+)\b/g;
+  // Use unique markers that won't appear in SQL
+  const COMMENT_MARK = '\u0001C';
+  const STRING_MARK = '\u0001S';
+  const KEYWORD_MARK = '\u0001K';
+  const NUMBER_MARK = '\u0001N';
+  const END_MARK = '\u0002';
 
-  // Apply highlighting via string replacement
-  const result = sql.replace(comments, '<span class="text-green-500">$1</span>')
-    .replace(strings, '<span class="text-amber-400">$1</span>')
-    .replace(keywords, '<span class="text-purple-400 font-semibold">$1</span>')
-    .replace(numbers, '<span class="text-cyan-400">$1</span>');
+  const keywords = /\b(SELECT|FROM|WHERE|JOIN|INNER|LEFT|RIGHT|OUTER|FULL|ON|AND|OR|AS|ORDER|BY|GROUP|HAVING|LIMIT|OFFSET|UNION|DISTINCT|INSERT|UPDATE|DELETE|CREATE|ALTER|DROP|TABLE|VIEW|INDEX|PRIMARY|FOREIGN|KEY|REFERENCES|CONSTRAINT|DEFAULT|NOT|NULL|IN|BETWEEN|LIKE|EXISTS|CASE|WHEN|THEN|ELSE|END|SET|VALUES|INTO|WITH|PROCEDURE|FUNCTION|TRIGGER|SERIAL|INT|INTEGER|VARCHAR|CHAR|TEXT|BOOLEAN|BOOL|DATE|DATETIME|TIMESTAMP|DECIMAL|FLOAT|DOUBLE|NUMERIC|BIGINT|SMALLINT|AUTO_INCREMENT|IDENTITY|UNIQUE|CHECK)\b/gi;
+
+  // First pass: mark elements with unique markers (order matters)
+  let result = sql
+    .replace(/(--[^\n]*)/g, `${COMMENT_MARK}$1${END_MARK}`)
+    .replace(/('[^']*')/g, `${STRING_MARK}$1${END_MARK}`)
+    .replace(keywords, `${KEYWORD_MARK}$1${END_MARK}`)
+    .replace(/\b(\d+)\b/g, `${NUMBER_MARK}$1${END_MARK}`);
+
+  // Second pass: convert markers to HTML spans
+  result = result
+    .replace(/\u0001C/g, '<span class="text-green-500">')
+    .replace(/\u0001S/g, '<span class="text-amber-400">')
+    .replace(/\u0001K/g, '<span class="text-purple-400 font-semibold">')
+    .replace(/\u0001N/g, '<span class="text-cyan-400">')
+    .replace(/\u0002/g, '</span>');
 
   return <span dangerouslySetInnerHTML={{ __html: result }} />;
 };
