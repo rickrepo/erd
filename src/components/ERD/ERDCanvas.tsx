@@ -213,43 +213,35 @@ const ERDCanvas: React.FC<ERDCanvasProps> = ({
     useStore.getState().setRelationships(entry.relationships);
   }, [tables, relationships]);
 
-  // Auto-animate relationships on first load or when new relationships are added
+  // Auto-animate relationships when NEW relationships are added (not on initial load)
+  // IMPORTANT: Don't call setActiveRelationships here - that's handled by the parent component
   useEffect(() => {
     if (relationships.length === 0) {
       hasAnimatedRef.current = false;
+      prevRelCountRef.current = 0;
       return;
     }
 
-    // New relationships were added
+    // Skip animation on first render - let parent handle initial state
+    if (prevRelCountRef.current === 0) {
+      prevRelCountRef.current = relationships.length;
+      hasAnimatedRef.current = true;
+      return;
+    }
+
+    // New relationships were added - only animate, don't change activeRelationships
     if (relationships.length > prevRelCountRef.current) {
-      // Animate the new relationships one by one
       const newRels = relationships.slice(prevRelCountRef.current);
-      let delay = 0;
       newRels.forEach((rel, i) => {
         setTimeout(() => {
           setAnimatingRelationship(rel.id);
-          setActiveRelationships(prev => new Set([...prev, rel.id]));
           setTimeout(() => setAnimatingRelationship(null), 600);
-        }, delay);
-        delay += 400 * (i + 1);
-      });
-    }
-    // First load - animate first few relationships to show how they work
-    else if (!hasAnimatedRef.current && relationships.length > 0) {
-      hasAnimatedRef.current = true;
-      // Animate first 3 relationships with delay
-      const toAnimate = relationships.slice(0, 3);
-      toAnimate.forEach((rel, i) => {
-        setTimeout(() => {
-          setAnimatingRelationship(rel.id);
-          setActiveRelationships(prev => new Set([...prev, rel.id]));
-          setTimeout(() => setAnimatingRelationship(null), 600);
-        }, 500 + i * 500);
+        }, i * 400);
       });
     }
 
     prevRelCountRef.current = relationships.length;
-  }, [relationships, setActiveRelationships, setAnimatingRelationship]);
+  }, [relationships.length, setAnimatingRelationship]);
 
   // Handle FK column click - toggle relationship visibility with animation
   const handleFKClick = useCallback((tableId: string, columnName: string) => {
@@ -459,12 +451,17 @@ const ERDCanvas: React.FC<ERDCanvasProps> = ({
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 
-  // Track previous table/relationship IDs to avoid unnecessary updates
-  const prevTableIdsForNodesRef = useRef<string>('');
-  const prevRelIdsForEdgesRef = useRef<string>('');
+  // Track if this is the initial mount to skip first effect run
+  const isInitialMountRef = useRef(true);
+  const prevTableIdsForNodesRef = useRef<string>(tables.map(t => t.id).sort().join(','));
+  const prevRelIdsForEdgesRef = useRef<string>(relationships.map(r => r.id).sort().join(','));
 
-  // Update nodes when tables actually change (not just callback references)
+  // Update nodes when tables actually change (skip initial mount)
   useEffect(() => {
+    // Skip initial mount - useNodesState already has the right data
+    if (isInitialMountRef.current) {
+      return;
+    }
     const currentTableIds = tables.map(t => t.id).sort().join(',');
     if (currentTableIds !== prevTableIdsForNodesRef.current) {
       prevTableIdsForNodesRef.current = currentTableIds;
@@ -472,8 +469,12 @@ const ERDCanvas: React.FC<ERDCanvasProps> = ({
     }
   }, [initialNodes, setNodes, tables]);
 
-  // Update edges when relationships actually change
+  // Update edges when relationships actually change (skip initial mount)
   useEffect(() => {
+    // Skip initial mount - useEdgesState already has the right data
+    if (isInitialMountRef.current) {
+      return;
+    }
     const currentRelIds = relationships.map(r => r.id).sort().join(',');
     if (currentRelIds !== prevRelIdsForEdgesRef.current) {
       prevRelIdsForEdgesRef.current = currentRelIds;
@@ -481,8 +482,18 @@ const ERDCanvas: React.FC<ERDCanvasProps> = ({
     }
   }, [initialEdges, setEdges, relationships]);
 
-  // Update selected state
+  // Mark initial mount as complete after first render cycle
   useEffect(() => {
+    isInitialMountRef.current = false;
+  }, []);
+
+  // Update selected state (only when selectedTable actually changes, skip null->null)
+  const prevSelectedTableRef = useRef<string | null>(selectedTable);
+  useEffect(() => {
+    if (prevSelectedTableRef.current === selectedTable) {
+      return;
+    }
+    prevSelectedTableRef.current = selectedTable;
     setNodes((nds) =>
       nds.map((node) => ({
         ...node,
