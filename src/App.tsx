@@ -2,6 +2,7 @@ import { useEffect, useCallback, useState } from 'react';
 import { ReactFlowProvider, useReactFlow } from '@xyflow/react';
 import Sidebar from './components/Sidebar/Sidebar';
 import ERDCanvas from './components/ERD/ERDCanvas';
+import { ERDErrorBoundary } from './components/ERD/ErrorBoundary';
 import { Header } from './components/common/Header';
 import { MobileActions } from './components/common/MobileActions';
 import { WelcomeModal } from './components/common/WelcomeModal';
@@ -280,7 +281,7 @@ const AppContent: React.FC = () => {
     <div className="w-full h-[100dvh] flex flex-col bg-slate-900 overflow-hidden">
       {/* Debug panel at TOP to trace App state */}
       <div className="fixed top-16 right-4 bg-green-900/95 text-white p-3 rounded-lg z-[200] text-xs font-mono border-2 border-green-500">
-        <p className="font-bold mb-1">APP DEBUG v1.9.5</p>
+        <p className="font-bold mb-1">APP DEBUG v1.9.6</p>
         <p>showWelcome: {showWelcome ? 'true' : 'false'}</p>
         <p>isDemoMode: {isDemoMode ? 'true' : 'false'}</p>
         <p>tables: {tables.length}</p>
@@ -305,13 +306,15 @@ const AppContent: React.FC = () => {
               onAnimateChain={handleAnimateChain}
             />
             <div className="flex-1 relative">
-              <ERDCanvas
-                activeRelationships={activeRelationships}
-                setActiveRelationships={setActiveRelationships}
-                animatingRelationship={animatingRelationship}
-                setAnimatingRelationship={setAnimatingRelationship}
-                hiddenTables={hiddenTables}
-              />
+              <ERDErrorBoundary>
+                <ERDCanvas
+                  activeRelationships={activeRelationships}
+                  setActiveRelationships={setActiveRelationships}
+                  animatingRelationship={animatingRelationship}
+                  setAnimatingRelationship={setAnimatingRelationship}
+                  hiddenTables={hiddenTables}
+                />
+              </ERDErrorBoundary>
             </div>
           </>
         )}
@@ -324,13 +327,15 @@ const AppContent: React.FC = () => {
                 <Sidebar />
               </div>
               <div className={mobilePanel === 'canvas' ? 'h-full' : 'hidden'}>
-                <ERDCanvas
-                  activeRelationships={activeRelationships}
-                  setActiveRelationships={setActiveRelationships}
-                  animatingRelationship={animatingRelationship}
-                  setAnimatingRelationship={setAnimatingRelationship}
-                  hiddenTables={hiddenTables}
-                />
+                <ERDErrorBoundary>
+                  <ERDCanvas
+                    activeRelationships={activeRelationships}
+                    setActiveRelationships={setActiveRelationships}
+                    animatingRelationship={animatingRelationship}
+                    setAnimatingRelationship={setAnimatingRelationship}
+                    hiddenTables={hiddenTables}
+                  />
+                </ERDErrorBoundary>
               </div>
               <div className={mobilePanel === 'joins' ? 'h-full' : 'hidden'}>
                 <MobileJoinsPanel
