@@ -3,22 +3,15 @@ import {
   Code,
   ChevronDown,
   ChevronUp,
-  Link,
-  ArrowRight,
-  Eye,
-  EyeOff,
-  Sparkles,
-  Play,
   Database,
+  CheckCircle,
+  Table as TableIcon,
+  Link,
 } from 'lucide-react';
 import { useStore } from '../../store/useStore';
-import { useAuthStore } from '../../store/useAuthStore';
 import type { SQLDialect } from '../../store/useStore';
 import { toast } from '../common/Toast';
 import { parseCreateTableStatements, inferRelationships, joinsToRelationships, parseSQLQueries, createTablesFromQuery } from '../../utils/sqlParser';
-
-// App version
-const APP_VERSION = '1.0.0';
 
 const DIALECT_OPTIONS: { id: SQLDialect; label: string }[] = [
   { id: 'sql', label: 'Standard SQL' },
@@ -55,20 +48,10 @@ function isValidTableName(name: string): boolean {
 }
 
 interface SidebarProps {
-  activeRelationships: Set<string>;
-  onToggleRelationship: (relId: string) => void;
-  onShowAll: () => void;
-  onHideAll: () => void;
-  onAnimateChain: (startRelId: string) => void;
+  // Props no longer needed - joins managed in Joins tab
 }
 
-const Sidebar: React.FC<SidebarProps> = ({
-  activeRelationships,
-  onToggleRelationship,
-  onShowAll,
-  onHideAll,
-  onAnimateChain,
-}) => {
+const Sidebar: React.FC<SidebarProps> = () => {
   const {
     tables,
     relationships,
@@ -99,8 +82,6 @@ const Sidebar: React.FC<SidebarProps> = ({
   const [showDialectDropdown, setShowDialectDropdown] = useState(false);
   const dialectDropdownRef = useRef<HTMLDivElement>(null);
 
-  const { subscription, setShowPremiumModal } = useAuthStore();
-
   // Expand SQL input when tables are cleared
   useEffect(() => {
     if (tables.length === 0) {
@@ -120,37 +101,6 @@ const Sidebar: React.FC<SidebarProps> = ({
   }, []);
 
   const currentDialect = DIALECT_OPTIONS.find(d => d.id === sqlDialect) || DIALECT_OPTIONS[0];
-
-  // Group relationships by source table for better organization
-  const groupedRelationships = relationships.reduce((acc, rel) => {
-    const sourceTable = tables.find(t => t.id === rel.sourceTable);
-    const tableName = sourceTable?.name || 'Unknown';
-    if (!acc[tableName]) acc[tableName] = [];
-    acc[tableName].push(rel);
-    return acc;
-  }, {} as Record<string, typeof relationships>);
-
-  // Find relationship chains (e.g., users -> orders -> order_items)
-  const findChain = (startRelId: string): string[] => {
-    const chain: string[] = [startRelId];
-    const startRel = relationships.find(r => r.id === startRelId);
-    if (!startRel) return chain;
-
-    let currentTargetTable = startRel.targetTable;
-    const visited = new Set([startRelId]);
-
-    while (true) {
-      const nextRel = relationships.find(r =>
-        r.sourceTable === currentTargetTable && !visited.has(r.id)
-      );
-      if (!nextRel) break;
-      chain.push(nextRel.id);
-      visited.add(nextRel.id);
-      currentTargetTable = nextRel.targetTable;
-    }
-
-    return chain;
-  };
 
   const handleParseSQL = () => {
     if (!sqlInput.trim()) return;
@@ -234,9 +184,6 @@ const Sidebar: React.FC<SidebarProps> = ({
       toast.error('Parse error', 'Could not parse SQL. Check syntax and try again.');
     }
   };
-
-  const visibleCount = activeRelationships.size;
-  const totalCount = relationships.length;
 
   return (
     <div className="w-full lg:w-80 h-full bg-slate-800 lg:border-r border-slate-700 flex flex-col">
@@ -327,155 +274,61 @@ CREATE TABLE orders (
         )}
       </div>
 
-      {/* Relationship Explorer - Main Content */}
-      <div className="flex-1 overflow-hidden flex flex-col">
-        {/* Header */}
-        <div className="px-3 py-3 border-b border-slate-700/50">
-          <div className="flex items-center justify-between mb-2">
-            <h2 className="text-sm font-semibold text-white flex items-center gap-2">
-              <Link className="w-4 h-4 text-purple-400" />
-              Discovered Joins
-            </h2>
-            <span className="text-xs text-slate-400">{visibleCount}/{totalCount} visible</span>
-          </div>
-
-          {totalCount > 0 && (
-            <div className="flex gap-1.5">
-              <button
-                onClick={onShowAll}
-                className="flex-1 py-1.5 px-2 text-[10px] font-medium bg-slate-700/50 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors flex items-center justify-center gap-1"
-              >
-                <Eye className="w-3 h-3" />
-                Show All
-              </button>
-              <button
-                onClick={onHideAll}
-                className="flex-1 py-1.5 px-2 text-[10px] font-medium bg-slate-700/50 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors flex items-center justify-center gap-1"
-              >
-                <EyeOff className="w-3 h-3" />
-                Hide All
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* Relationship List */}
+      {/* Schema Summary - shown when tables exist */}
+      {tables.length > 0 && (
         <div className="flex-1 overflow-auto p-3">
-          {totalCount === 0 ? (
-            <div className="text-center py-6">
-              <div className="w-10 h-10 rounded-full bg-slate-700/50 flex items-center justify-center mx-auto mb-3">
-                <Sparkles className="w-5 h-5 text-purple-400 opacity-50" />
-              </div>
-              <p className="text-sm text-slate-400 mb-1">No relationships yet</p>
-              <p className="text-xs text-slate-500">Paste SQL above to discover table relationships</p>
+          {/* Success indicator */}
+          <div className="mb-4 p-3 bg-green-900/20 border border-green-700/30 rounded-lg">
+            <div className="flex items-center gap-2 text-green-400 mb-1">
+              <CheckCircle className="w-4 h-4" />
+              <span className="text-sm font-medium">Schema Loaded</span>
             </div>
-          ) : (
-            <div className="space-y-3">
-              {Object.entries(groupedRelationships).map(([tableName, rels]) => (
-                <div key={tableName}>
-                  <div className="text-[10px] font-medium text-slate-500 uppercase tracking-wider mb-1.5 px-1">
-                    From {tableName}
-                  </div>
-                  <div className="space-y-1">
-                    {rels.map((rel) => {
-                      const targetTable = tables.find(t => t.id === rel.targetTable);
-                      const isActive = activeRelationships.has(rel.id);
-                      const chain = findChain(rel.id);
-                      const hasChain = chain.length > 1;
+            <p className="text-xs text-slate-400">
+              {tables.length} table{tables.length !== 1 ? 's' : ''} and {relationships.length} join{relationships.length !== 1 ? 's' : ''} discovered
+            </p>
+          </div>
 
-                      return (
-                        <div
-                          key={rel.id}
-                          className={`
-                            group rounded-lg border transition-all cursor-pointer
-                            ${isActive
-                              ? 'bg-purple-500/20 border-purple-500/50'
-                              : 'bg-slate-700/30 border-slate-700 hover:border-slate-600 hover:bg-slate-700/50'
-                            }
-                          `}
-                        >
-                          <button
-                            onClick={() => onToggleRelationship(rel.id)}
-                            className="w-full p-2.5 flex items-center gap-2 text-left"
-                          >
-                            <div className={`
-                              w-2 h-2 rounded-full flex-shrink-0 transition-all
-                              ${isActive
-                                ? 'bg-purple-400 shadow-lg shadow-purple-400/50'
-                                : 'bg-slate-600 group-hover:bg-purple-400/50'
-                              }
-                            `} />
+          {/* Table list */}
+          <div className="space-y-1">
+            <div className="text-[10px] font-medium text-slate-500 uppercase tracking-wider mb-2">
+              Tables
+            </div>
+            {tables.map((table) => (
+              <div
+                key={table.id}
+                className="flex items-center gap-2 px-2.5 py-2 bg-slate-700/30 rounded-lg"
+              >
+                <TableIcon className="w-3.5 h-3.5 text-blue-400" />
+                <span className="text-xs text-white font-medium">{table.name}</span>
+                <span className="text-[10px] text-slate-500 ml-auto">
+                  {table.columns.length} col{table.columns.length !== 1 ? 's' : ''}
+                </span>
+              </div>
+            ))}
+          </div>
 
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-1.5 text-xs">
-                                <span className={`font-medium ${isActive ? 'text-purple-300' : 'text-slate-300'}`}>
-                                  {rel.sourceColumn}
-                                </span>
-                                <ArrowRight className="w-3 h-3 text-slate-500 flex-shrink-0" />
-                                <span className={`font-medium truncate ${isActive ? 'text-blue-300' : 'text-slate-300'}`}>
-                                  {targetTable?.name}.{rel.targetColumn}
-                                </span>
-                              </div>
-                              <div className="text-[10px] text-slate-500 mt-0.5">
-                                {rel.type === 'one-to-one' ? '1:1' : rel.type === 'one-to-many' ? '1:N' : 'N:M'}
-                                {hasChain && (
-                                  <span className="ml-2 text-purple-400">• {chain.length} table chain</span>
-                                )}
-                              </div>
-                            </div>
-
-                            <div className={`p-1 rounded transition-colors ${isActive ? 'text-purple-300' : 'text-slate-500'}`}>
-                              {isActive ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
-                            </div>
-                          </button>
-
-                          {hasChain && isActive && (
-                            <div className="px-2.5 pb-2">
-                              <button
-                                onClick={(e) => { e.stopPropagation(); onAnimateChain(rel.id); }}
-                                className="w-full py-1.5 text-[10px] font-medium bg-purple-500/30 hover:bg-purple-500/50 text-purple-200 rounded-md transition-colors flex items-center justify-center gap-1.5"
-                              >
-                                <Play className="w-3 h-3" />
-                                Animate {chain.length}-table chain
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
+          {/* Tip about joins tab */}
+          {relationships.length > 0 && (
+            <div className="mt-4 p-2.5 bg-purple-900/20 border border-purple-700/30 rounded-lg">
+              <p className="text-[10px] text-purple-300 flex items-center gap-1.5">
+                <Link className="w-3 h-3" />
+                <span>View and manage joins in the <strong>Joins</strong> tab</span>
+              </p>
             </div>
           )}
         </div>
+      )}
 
-        {/* AI Upgrade Prompt */}
-        {totalCount > 0 && subscription.tier === 'free' && (
-          <div className="p-3 border-t border-slate-700">
-            <button
-              onClick={() => setShowPremiumModal(true, 'feature')}
-              className="w-full p-2.5 rounded-lg bg-gradient-to-r from-purple-900/50 to-blue-900/50 border border-purple-500/30 hover:border-purple-500/50 transition-colors"
-            >
-              <div className="flex items-center gap-2 mb-0.5">
-                <Sparkles className="w-3.5 h-3.5 text-purple-400" />
-                <span className="text-xs font-semibold text-white">AI Query Builder</span>
-                <span className="px-1.5 py-0.5 bg-purple-500/30 text-purple-300 text-[9px] font-bold rounded">PRO</span>
-              </div>
-              <p className="text-[10px] text-slate-400 text-left">
-                Generate SQL queries from your schema
-              </p>
-            </button>
+      {/* Empty state when no tables */}
+      {tables.length === 0 && !sqlExpanded && (
+        <div className="flex-1 flex items-center justify-center p-4">
+          <div className="text-center">
+            <Database className="w-10 h-10 text-slate-600 mx-auto mb-3" />
+            <p className="text-sm text-slate-400 mb-1">No schema loaded</p>
+            <p className="text-xs text-slate-500">Paste SQL above to get started</p>
           </div>
-        )}
-
-        {/* Version & Copyright */}
-        <div className="px-3 py-2 border-t border-slate-700/50 text-center">
-          <p className="text-[9px] text-slate-600">
-            SchemaFlow v{APP_VERSION} · © {new Date().getFullYear()} All rights reserved
-          </p>
         </div>
-      </div>
+      )}
     </div>
   );
 };

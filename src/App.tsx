@@ -249,13 +249,7 @@ const AppContent: React.FC = () => {
         {/* Desktop layout */}
         {!isMobile && (
           <>
-            <Sidebar
-              activeRelationships={activeRelationships}
-              onToggleRelationship={handleToggleRelationship}
-              onShowAll={handleShowAll}
-              onHideAll={handleHideAll}
-              onAnimateChain={handleAnimateChain}
-            />
+            <Sidebar />
             <div className="flex-1 relative">
               <ERDCanvas
                 activeRelationships={activeRelationships}
@@ -273,13 +267,7 @@ const AppContent: React.FC = () => {
           <>
             <div className="flex-1 overflow-hidden relative">
               <div className={mobilePanel === 'sidebar' ? 'h-full' : 'hidden'}>
-                <Sidebar
-                  activeRelationships={activeRelationships}
-                  onToggleRelationship={handleToggleRelationship}
-                  onShowAll={handleShowAll}
-                  onHideAll={handleHideAll}
-                  onAnimateChain={handleAnimateChain}
-                />
+                <Sidebar />
               </div>
               <div className={mobilePanel === 'canvas' ? 'h-full' : 'hidden'}>
                 <ERDCanvas

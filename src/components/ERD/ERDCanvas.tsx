@@ -801,8 +801,8 @@ const ERDCanvas: React.FC<ERDCanvasProps> = ({
           zoomable
         />
 
-        {/* Layout Toolbar */}
-        <Panel position="top-left" className="flex items-center gap-2">
+        {/* Layout Toolbar - Desktop only */}
+        <Panel position="top-left" className="hidden lg:flex items-center gap-2">
           <div className="bg-slate-800/95 backdrop-blur-sm rounded-lg p-1 flex gap-1 shadow-lg border border-slate-700/80">
             <button
               onClick={() => handleLayout('grid')}
@@ -843,8 +843,8 @@ const ERDCanvas: React.FC<ERDCanvasProps> = ({
           </div>
         </Panel>
 
-        {/* Actions */}
-        <Panel position="top-right" className="flex items-center gap-2">
+        {/* Actions - Desktop only */}
+        <Panel position="top-right" className="hidden lg:flex items-center gap-2">
           {tables.length > 0 && (
             <>
               <button
