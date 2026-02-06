@@ -836,20 +836,8 @@ const ERDCanvas: React.FC<ERDCanvasProps> = ({
     return () => clearTimeout(timer);
   }, [renamingTable, updateTable]);
 
-  // Debug: log to help diagnose
-  console.log('ERDCanvas render:', { allTables: allTables.length, tables: tables.length, nodes: nodes.length });
-
   return (
     <div className="w-full h-full relative bg-slate-900">
-      {/* Debug panel at TOP of component to ensure it renders even if ReactFlow crashes */}
-      <div className="absolute top-4 left-4 bg-red-900/95 text-white p-3 rounded-lg z-[100] text-xs font-mono border-2 border-red-500">
-        <p className="font-bold mb-1">DEBUG v1.9.7</p>
-        <p>allTables: {allTables.length}</p>
-        <p>tables: {tables.length}</p>
-        <p>nodes: {nodes.length}</p>
-        <p>hidden: {hiddenTables.size}</p>
-      </div>
-
       <EdgeMarkerDefs />
 
       <ReactFlow
