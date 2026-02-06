@@ -1,70 +1,54 @@
-// Robust usage tracking to prevent bypass by clearing localStorage
-
-// Generate a semi-stable device fingerprint
-function generateFingerprint(): string {
-  const components: string[] = [];
-
-  // Browser and OS info
-  components.push(navigator.userAgent);
-  components.push(navigator.language);
-  components.push(String(navigator.hardwareConcurrency || 0));
-  components.push(String(screen.width));
-  components.push(String(screen.height));
-  components.push(String(screen.colorDepth));
-  components.push(Intl.DateTimeFormat().resolvedOptions().timeZone);
-
-  // Canvas fingerprint
-  try {
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    if (ctx) {
-      ctx.textBaseline = 'top';
-      ctx.font = '14px Arial';
-      ctx.fillText('SchemaFlow-FP', 2, 2);
-      components.push(canvas.toDataURL().slice(-50));
-    }
-  } catch {
-    components.push('no-canvas');
-  }
-
-  // Create hash from components
-  const str = components.join('|');
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    const char = str.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash;
-  }
-  return 'fp-' + Math.abs(hash).toString(36);
-}
+// Simple usage tracking with redundant storage to prevent easy bypass
 
 // Storage keys
 const STORAGE_KEY = 'schemaflow-usage';
+const ID_KEY = 'schemaflow-id';
 const IDB_NAME = 'schemaflow-db';
 const IDB_STORE = 'usage';
 
 interface UsageData {
-  fingerprint: string;
+  visitorId: string;
   anonymousGenerations: number;
   registeredUserId?: string;
   lastUpdated: string;
 }
 
-// Get or create fingerprint
-let cachedFingerprint: string | null = null;
-export function getDeviceFingerprint(): string {
-  if (cachedFingerprint) return cachedFingerprint;
+// Generate a random visitor ID (simple UUID v4)
+function generateVisitorId(): string {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
 
-  // Try to get existing fingerprint from storage
-  const stored = getFromLocalStorage();
-  if (stored?.fingerprint) {
-    cachedFingerprint = stored.fingerprint;
-    return cachedFingerprint;
+// Get or create visitor ID from any available storage
+let cachedVisitorId: string | null = null;
+
+function getVisitorId(): string {
+  if (cachedVisitorId) return cachedVisitorId;
+
+  // Try to get existing ID from any storage
+  try {
+    cachedVisitorId = localStorage.getItem(ID_KEY) || sessionStorage.getItem(ID_KEY);
+  } catch {
+    // Storage access might fail in some browsers
   }
 
-  // Generate new fingerprint
-  cachedFingerprint = generateFingerprint();
-  return cachedFingerprint;
+  // Generate new ID if none exists
+  if (!cachedVisitorId) {
+    cachedVisitorId = generateVisitorId();
+  }
+
+  // Sync ID to all storages
+  try {
+    localStorage.setItem(ID_KEY, cachedVisitorId);
+  } catch { /* ignore */ }
+  try {
+    sessionStorage.setItem(ID_KEY, cachedVisitorId);
+  } catch { /* ignore */ }
+
+  return cachedVisitorId;
 }
 
 // localStorage functions
@@ -114,18 +98,18 @@ async function getFromIndexedDB(): Promise<UsageData | null> {
       request.onupgradeneeded = (event) => {
         const db = (event.target as IDBOpenDBRequest).result;
         if (!db.objectStoreNames.contains(IDB_STORE)) {
-          db.createObjectStore(IDB_STORE, { keyPath: 'fingerprint' });
+          db.createObjectStore(IDB_STORE, { keyPath: 'visitorId' });
         }
       };
 
       request.onsuccess = (event) => {
         const db = (event.target as IDBOpenDBRequest).result;
-        const fp = getDeviceFingerprint();
+        const visitorId = getVisitorId();
 
         try {
           const transaction = db.transaction(IDB_STORE, 'readonly');
           const store = transaction.objectStore(IDB_STORE);
-          const getRequest = store.get(fp);
+          const getRequest = store.get(visitorId);
 
           getRequest.onsuccess = () => resolve(getRequest.result || null);
           getRequest.onerror = () => resolve(null);
@@ -149,7 +133,7 @@ async function saveToIndexedDB(data: UsageData): Promise<void> {
       request.onupgradeneeded = (event) => {
         const db = (event.target as IDBOpenDBRequest).result;
         if (!db.objectStoreNames.contains(IDB_STORE)) {
-          db.createObjectStore(IDB_STORE, { keyPath: 'fingerprint' });
+          db.createObjectStore(IDB_STORE, { keyPath: 'visitorId' });
         }
       };
 
@@ -174,7 +158,7 @@ async function saveToIndexedDB(data: UsageData): Promise<void> {
 
 // Get combined usage data (takes max from all sources)
 export async function getUsageData(): Promise<UsageData> {
-  const fingerprint = getDeviceFingerprint();
+  const visitorId = getVisitorId();
 
   const localData = getFromLocalStorage();
   const sessionData = getFromSessionStorage();
@@ -189,7 +173,7 @@ export async function getUsageData(): Promise<UsageData> {
   );
 
   return {
-    fingerprint,
+    visitorId,
     anonymousGenerations: maxGenerations,
     registeredUserId: localData?.registeredUserId || sessionData?.registeredUserId || idbData?.registeredUserId,
     lastUpdated: new Date().toISOString(),
