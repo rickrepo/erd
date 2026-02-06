@@ -88,6 +88,7 @@ export interface ERDCanvasProps {
   setActiveRelationships: React.Dispatch<React.SetStateAction<Set<string>>>;
   animatingRelationship: string | null;
   setAnimatingRelationship: React.Dispatch<React.SetStateAction<string | null>>;
+  hiddenTables?: Set<string>;
 }
 
 const ERDCanvas: React.FC<ERDCanvasProps> = ({
@@ -95,10 +96,11 @@ const ERDCanvas: React.FC<ERDCanvasProps> = ({
   setActiveRelationships,
   animatingRelationship,
   setAnimatingRelationship,
+  hiddenTables = new Set(),
 }) => {
   const {
-    tables,
-    relationships,
+    tables: allTables,
+    relationships: allRelationships,
     setSelectedTable,
     setSelectedRelationship,
     addRelationship,
@@ -112,6 +114,19 @@ const ERDCanvas: React.FC<ERDCanvasProps> = ({
     reset,
   } = useStore();
 
+  // Filter out hidden tables and their relationships
+  const tables = useMemo(() =>
+    allTables.filter(t => !hiddenTables.has(t.id)),
+    [allTables, hiddenTables]
+  );
+
+  const relationships = useMemo(() =>
+    allRelationships.filter(r =>
+      !hiddenTables.has(r.sourceTable) && !hiddenTables.has(r.targetTable)
+    ),
+    [allRelationships, hiddenTables]
+  );
+
   const { subscription, setShowPremiumModal } = useAuthStore();
   const isPremium = subscription.tier === 'pro' || subscription.tier === 'enterprise';
 
@@ -121,7 +136,7 @@ const ERDCanvas: React.FC<ERDCanvasProps> = ({
 
   // Track if we've done the initial animation
   const hasAnimatedRef = useRef(false);
-  const prevRelCountRef = useRef(relationships.length);
+  const prevRelCountRef = useRef(allRelationships.length);
 
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{

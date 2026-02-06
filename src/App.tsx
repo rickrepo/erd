@@ -16,6 +16,7 @@ import { useAdminStore } from './store/useAdminStore';
 import { DEMO_TABLES, DEMO_RELATIONSHIPS, DEMO_SQL_QUERIES } from './utils/demoData';
 import { GitBranch, Code, Link } from 'lucide-react';
 import { MobileJoinsPanel } from './components/common/MobileJoinsPanel';
+import { VersionFooter } from './components/common/VersionFooter';
 
 type MobilePanel = 'sidebar' | 'canvas' | 'joins';
 
@@ -39,6 +40,37 @@ const AppContent: React.FC = () => {
   // Active relationships state - lifted to App for sharing between Sidebar and Canvas
   const [activeRelationships, setActiveRelationships] = useState<Set<string>>(new Set());
   const [animatingRelationship, setAnimatingRelationship] = useState<string | null>(null);
+  const [hiddenTables, setHiddenTables] = useState<Set<string>>(new Set());
+
+  // Auto-hide tables when all their relationships are hidden
+  useEffect(() => {
+    if (activeRelationships.size === 0) return;
+
+    const tablesWithVisibleRelationships = new Set<string>();
+    for (const relId of activeRelationships) {
+      const rel = relationships.find(r => r.id === relId);
+      if (rel) {
+        tablesWithVisibleRelationships.add(rel.sourceTable);
+        tablesWithVisibleRelationships.add(rel.targetTable);
+      }
+    }
+
+    // Auto-hide tables that have no visible relationships
+    const newHiddenTables = new Set<string>();
+    for (const table of tables) {
+      const hasVisibleRelationship = tablesWithVisibleRelationships.has(table.id);
+      const hasAnyRelationship = relationships.some(
+        r => r.sourceTable === table.id || r.targetTable === table.id
+      );
+
+      // Only auto-hide if table has relationships but none are visible
+      if (hasAnyRelationship && !hasVisibleRelationship) {
+        newHiddenTables.add(table.id);
+      }
+    }
+
+    setHiddenTables(newHiddenTables);
+  }, [activeRelationships, relationships, tables]);
 
   const { fitView } = useReactFlow();
 
@@ -230,6 +262,7 @@ const AppContent: React.FC = () => {
                 setActiveRelationships={setActiveRelationships}
                 animatingRelationship={animatingRelationship}
                 setAnimatingRelationship={setAnimatingRelationship}
+                hiddenTables={hiddenTables}
               />
             </div>
           </>
@@ -254,6 +287,7 @@ const AppContent: React.FC = () => {
                   setActiveRelationships={setActiveRelationships}
                   animatingRelationship={animatingRelationship}
                   setAnimatingRelationship={setAnimatingRelationship}
+                  hiddenTables={hiddenTables}
                 />
               </div>
               <div className={mobilePanel === 'joins' ? 'h-full' : 'hidden'}>
@@ -329,6 +363,9 @@ const AppContent: React.FC = () => {
       {isMobile && (
         <MobileActions onShowSql={() => setMobilePanel('sidebar')} />
       )}
+
+      {/* Version Footer */}
+      <VersionFooter />
 
       {/* Toast Notifications */}
       <ToastContainer />

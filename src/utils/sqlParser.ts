@@ -127,11 +127,20 @@ export function parseSQLQueries(sql: string): ParsedQuery {
 function extractFromAST(ast: any, result: ParsedQuery) {
   if (!ast) return;
 
-  // Extract tables from FROM clause
+  // Build alias-to-table mapping
+  const aliasMap = new Map<string, string>();
+
+  // Extract tables from FROM clause and build alias map
   if (ast.from) {
     for (const from of ast.from) {
       if (from.table) {
         result.tables.push(from.table);
+        // Map alias to actual table name
+        if (from.as) {
+          aliasMap.set(from.as.toLowerCase(), from.table);
+        }
+        // Also map table name to itself for cases without alias
+        aliasMap.set(from.table.toLowerCase(), from.table);
       }
 
       // In node-sql-parser, JOINed tables have:
@@ -139,7 +148,7 @@ function extractFromAST(ast: any, result: ParsedQuery) {
       // - from.on = the ON condition
       // Check if this FROM entry is a joined table with an ON condition
       if (from.on) {
-        const joinInfo = extractJoinCondition(from.on);
+        const joinInfo = extractJoinCondition(from.on, aliasMap);
         if (joinInfo) {
           result.joins.push(joinInfo);
         }
@@ -151,8 +160,10 @@ function extractFromAST(ast: any, result: ParsedQuery) {
   if (ast.columns && Array.isArray(ast.columns)) {
     for (const col of ast.columns) {
       if (col.expr && col.expr.column && col.expr.table) {
+        // Resolve alias to actual table name
+        const actualTable = aliasMap.get(col.expr.table.toLowerCase()) || col.expr.table;
         result.columns.push({
-          table: col.expr.table,
+          table: actualTable,
           column: col.expr.column
         });
       }
@@ -161,21 +172,24 @@ function extractFromAST(ast: any, result: ParsedQuery) {
 
   // Extract from WHERE clause (for implicit joins)
   if (ast.where) {
-    const implicitJoins = extractImplicitJoins(ast.where);
+    const implicitJoins = extractImplicitJoins(ast.where, aliasMap);
     result.joins.push(...implicitJoins);
   }
 }
 
-function extractJoinCondition(condition: any): ParsedJoin | null {
+function extractJoinCondition(condition: any, aliasMap: Map<string, string>): ParsedJoin | null {
   if (condition.type === 'binary_expr' && condition.operator === '=') {
     const left = condition.left;
     const right = condition.right;
 
     if (left?.type === 'column_ref' && right?.type === 'column_ref') {
+      // Resolve aliases to actual table names
+      const leftTable = aliasMap.get(left.table?.toLowerCase() || '') || left.table || '';
+      const rightTable = aliasMap.get(right.table?.toLowerCase() || '') || right.table || '';
       return {
-        leftTable: left.table || '',
+        leftTable,
         leftColumn: left.column,
-        rightTable: right.table || '',
+        rightTable,
         rightColumn: right.column
       };
     }
@@ -183,7 +197,7 @@ function extractJoinCondition(condition: any): ParsedJoin | null {
   return null;
 }
 
-function extractImplicitJoins(condition: any): ParsedJoin[] {
+function extractImplicitJoins(condition: any, aliasMap: Map<string, string>): ParsedJoin[] {
   const joins: ParsedJoin[] = [];
 
   if (condition.type === 'binary_expr') {
@@ -193,17 +207,20 @@ function extractImplicitJoins(condition: any): ParsedJoin[] {
         condition.left.table &&
         condition.right.table &&
         condition.left.table !== condition.right.table) {
+      // Resolve aliases to actual table names
+      const leftTable = aliasMap.get(condition.left.table.toLowerCase()) || condition.left.table;
+      const rightTable = aliasMap.get(condition.right.table.toLowerCase()) || condition.right.table;
       joins.push({
-        leftTable: condition.left.table,
+        leftTable,
         leftColumn: condition.left.column,
-        rightTable: condition.right.table,
+        rightTable,
         rightColumn: condition.right.column
       });
     }
 
     if (condition.operator === 'AND' || condition.operator === 'OR') {
-      joins.push(...extractImplicitJoins(condition.left));
-      joins.push(...extractImplicitJoins(condition.right));
+      joins.push(...extractImplicitJoins(condition.left, aliasMap));
+      joins.push(...extractImplicitJoins(condition.right, aliasMap));
     }
   }
 
