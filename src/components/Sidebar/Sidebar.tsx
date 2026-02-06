@@ -192,8 +192,15 @@ const Sidebar: React.FC<SidebarProps> = ({
   // Track the last processed SQL to avoid loops
   const lastProcessedSqlRef = useRef<string>('');
 
-  // Sync local SQL input with store (for demo mode)
+  // Sync local SQL input with store (for demo mode and clear)
   useEffect(() => {
+    // Handle clear - when storeSqlInput becomes empty, clear local queries
+    if (!storeSqlInput && sqlQueries.length > 0) {
+      setSqlQueries([]);
+      lastProcessedSqlRef.current = '';
+      return;
+    }
+
     if (storeSqlInput && storeSqlInput !== lastProcessedSqlRef.current) {
       // Check if current queries already match the store input
       const currentCombined = sqlQueries.map(q => q.sql).join('\n\n');

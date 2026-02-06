@@ -111,7 +111,8 @@ const ERDCanvas: React.FC<ERDCanvasProps> = ({
     addColumn,
     updateTable,
     selectedTable,
-    reset,
+    sqlInput,
+    setSqlInput,
   } = useStore();
 
   // Filter out hidden tables and their relationships
@@ -530,6 +531,20 @@ const ERDCanvas: React.FC<ERDCanvasProps> = ({
     setSelectedTable(null);
   }, [removeTable, setSelectedTable]);
 
+  // Generate SQL SELECT for a table
+  const generateTableSQL = useCallback((tableName: string, columns: { name: string }[]) => {
+    const columnNames = columns.map(c => c.name).join(', ');
+    return `-- ${tableName} query\nSELECT ${columnNames}\nFROM ${tableName};`;
+  }, []);
+
+  // Append SQL for a new table
+  const appendTableSQL = useCallback((tableName: string, columns: { name: string }[]) => {
+    const newSQL = generateTableSQL(tableName, columns);
+    const currentSQL = sqlInput.trim();
+    const updatedSQL = currentSQL ? `${currentSQL}\n\n${newSQL}` : newSQL;
+    setSqlInput(updatedSQL);
+  }, [sqlInput, setSqlInput, generateTableSQL]);
+
   const handleDuplicateTable = useCallback((tableId: string) => {
     const original = tables.find(t => t.id === tableId);
     if (!original) return;
@@ -540,7 +555,9 @@ const ERDCanvas: React.FC<ERDCanvasProps> = ({
       color: getTableColor(tables.length),
     };
     addTable(newTable);
-  }, [tables, addTable]);
+    // Generate SQL for the duplicated table
+    appendTableSQL(newTable.name, original.columns);
+  }, [tables, addTable, appendTableSQL]);
 
   const handleAddColumnToTable = useCallback((tableId: string) => {
     const col: Column = {
@@ -576,15 +593,19 @@ const ERDCanvas: React.FC<ERDCanvasProps> = ({
   }, [screenToFlowPosition]);
 
   const handleCreateTable = useCallback((name: string, flowPosition?: { x: number; y: number }) => {
+    const columns = [
+      { name: 'id', type: 'INT', isPrimaryKey: true, isForeignKey: false, isNullable: false },
+    ];
     const newTable = {
       id: `table-${Date.now()}`,
       name,
-      columns: [
-        { name: 'id', type: 'INT', isPrimaryKey: true, isForeignKey: false, isNullable: false },
-      ],
+      columns,
       color: getTableColor(tables.length),
     };
     addTable(newTable);
+
+    // Generate SQL for this table
+    appendTableSQL(name, columns);
 
     if (flowPosition) {
       setTimeout(() => {
@@ -598,7 +619,7 @@ const ERDCanvas: React.FC<ERDCanvasProps> = ({
 
     setQuickTableDialog(null);
     setSelectedTable(newTable.id);
-  }, [tables.length, addTable, setNodes, setSelectedTable]);
+  }, [tables.length, addTable, setNodes, setSelectedTable, appendTableSQL]);
 
   // Re-layout with animation
   const handleLayout = useCallback((type: LayoutType) => {
@@ -846,26 +867,13 @@ const ERDCanvas: React.FC<ERDCanvasProps> = ({
         {/* Actions - Desktop only */}
         <Panel position="top-right" className="hidden lg:flex items-center gap-2">
           {tables.length > 0 && (
-            <>
-              <button
-                onClick={() => {
-                  if (confirm('Clear everything and start fresh?')) {
-                    reset();
-                    setActiveRelationships(new Set());
-                  }
-                }}
-                className="bg-slate-800/95 backdrop-blur-sm rounded-lg px-3 py-2 shadow-lg border border-slate-700/80 text-slate-400 hover:text-white hover:border-red-500/50 text-xs font-medium transition-all"
-              >
-                Clear
-              </button>
-              <button
-                onClick={() => setShowExport(true)}
-                className="bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-500 hover:to-purple-400 rounded-lg px-4 py-2 flex items-center gap-1.5 shadow-lg text-white font-medium text-xs transition-all"
-              >
-                <Download className="w-3.5 h-3.5" />
-                Export
-              </button>
-            </>
+            <button
+              onClick={() => setShowExport(true)}
+              className="bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-500 hover:to-purple-400 rounded-lg px-4 py-2 flex items-center gap-1.5 shadow-lg text-white font-medium text-xs transition-all"
+            >
+              <Download className="w-3.5 h-3.5" />
+              Export
+            </button>
           )}
         </Panel>
 
@@ -874,17 +882,35 @@ const ERDCanvas: React.FC<ERDCanvasProps> = ({
       {/* Empty State - Centered Overlay */}
       {tables.length === 0 && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
-          <div className="text-center max-w-md mx-auto animate-fadeIn pointer-events-auto">
-            <h3 className="text-2xl font-bold text-white mb-3">No Tables Yet</h3>
-            <p className="text-slate-400 mb-6">
-              Paste SQL in the sidebar or right-click anywhere to add tables manually.
+          <div className="text-center max-w-lg mx-auto animate-fadeIn pointer-events-auto px-4">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-purple-500/20 rounded-full mb-4">
+              <span className="text-purple-400 text-sm font-medium">Visualize your database relationships</span>
+            </div>
+            <h3 className="text-2xl sm:text-3xl font-bold text-white mb-4">Paste Your SQL Queries</h3>
+            <p className="text-slate-400 mb-6 text-sm sm:text-base leading-relaxed">
+              Paste <span className="text-purple-400 font-medium">SELECT queries with JOINs</span> or{' '}
+              <span className="text-purple-400 font-medium">CREATE TABLE</span> statements in the sidebar.
+              <br className="hidden sm:block" />
+              We'll automatically detect tables and their relationships.
             </p>
-            <button
-              onClick={() => handleQuickAddTable({ x: window.innerWidth / 2, y: window.innerHeight / 2 })}
-              className="px-6 py-3 bg-purple-600 hover:bg-purple-500 text-white rounded-xl font-medium transition-all"
-            >
-              Add First Table
-            </button>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <button
+                onClick={() => {
+                  // Focus the SQL input in sidebar
+                  const sidebar = document.querySelector('textarea');
+                  if (sidebar) sidebar.focus();
+                }}
+                className="px-6 py-3 bg-purple-600 hover:bg-purple-500 text-white rounded-xl font-medium transition-all"
+              >
+                Paste SQL to Start
+              </button>
+              <button
+                onClick={() => handleQuickAddTable({ x: window.innerWidth / 2, y: window.innerHeight / 2 })}
+                className="px-6 py-3 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-xl font-medium transition-all"
+              >
+                Or Add Tables Manually
+              </button>
+            </div>
           </div>
         </div>
       )}
