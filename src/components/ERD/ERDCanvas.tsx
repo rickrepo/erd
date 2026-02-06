@@ -1063,37 +1063,54 @@ const ERDCanvas: React.FC<ERDCanvasProps> = ({
 
       </ReactFlow>
 
-      {/* Empty State - Centered Overlay */}
+      {/* Empty State - Centered SQL Input */}
       {tables.length === 0 && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
-          <div className="text-center max-w-lg mx-auto animate-fadeIn pointer-events-auto px-4">
+          <div className="text-center max-w-2xl mx-auto animate-fadeIn pointer-events-auto px-4">
             <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-purple-500/20 rounded-full mb-4">
               <span className="text-purple-400 text-sm font-medium">Visualize your database relationships</span>
             </div>
-            <h3 className="text-2xl sm:text-3xl font-bold text-white mb-4">Paste Your SQL Queries</h3>
+            <h3 className="text-2xl sm:text-3xl font-bold text-white mb-4">Paste Your SQL</h3>
             <p className="text-slate-400 mb-6 text-sm sm:text-base leading-relaxed">
               Paste <span className="text-purple-400 font-medium">SELECT queries with JOINs</span> or{' '}
-              <span className="text-purple-400 font-medium">CREATE TABLE</span> statements in the sidebar.
-              <br className="hidden sm:block" />
-              We'll automatically detect tables and their relationships.
+              <span className="text-purple-400 font-medium">CREATE TABLE</span> statements below.
             </p>
-            <div className="flex flex-col sm:flex-row gap-3 justify-center">
-              <button
-                onClick={() => {
-                  // Focus the SQL input in sidebar
-                  const sidebar = document.querySelector('textarea');
-                  if (sidebar) sidebar.focus();
-                }}
-                className="px-6 py-3 bg-purple-600 hover:bg-purple-500 text-white rounded-xl font-medium transition-all"
-              >
-                Paste SQL to Start
-              </button>
-              <button
-                onClick={() => handleQuickAddTable({ x: window.innerWidth / 2, y: window.innerHeight / 2 })}
-                className="px-6 py-3 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-xl font-medium transition-all"
-              >
-                Or Add Tables Manually
-              </button>
+
+            {/* Centered SQL Input */}
+            <div className="bg-slate-800/90 backdrop-blur-sm rounded-xl border border-slate-700 p-4 mb-4">
+              <textarea
+                placeholder={`-- Paste your SQL here...\n\nSELECT * FROM users u\nJOIN orders o ON u.id = o.user_id\nJOIN products p ON o.product_id = p.id;\n\n-- Or CREATE TABLE statements:\nCREATE TABLE users (\n  id INT PRIMARY KEY,\n  email VARCHAR(255)\n);`}
+                className="w-full h-48 bg-slate-900 text-slate-100 font-mono text-sm p-4 rounded-lg border border-slate-600 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 outline-none resize-none placeholder:text-slate-500"
+                id="centered-sql-input"
+              />
+              <div className="flex gap-3 mt-4 justify-center">
+                <button
+                  onClick={() => {
+                    const textarea = document.getElementById('centered-sql-input') as HTMLTextAreaElement;
+                    if (textarea?.value.trim()) {
+                      // Set the SQL input in the store, which will trigger parsing via sidebar
+                      setSqlInput(textarea.value);
+                      // Focus the parse button in sidebar to trigger parse
+                      setTimeout(() => {
+                        const parseBtn = document.querySelector('[data-parse-btn]') as HTMLButtonElement;
+                        if (parseBtn) parseBtn.click();
+                      }, 100);
+                    }
+                  }}
+                  className="px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-500 hover:to-purple-400 text-white rounded-xl font-medium transition-all flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                  </svg>
+                  Parse SQL
+                </button>
+                <button
+                  onClick={() => handleQuickAddTable({ x: window.innerWidth / 2, y: window.innerHeight / 2 })}
+                  className="px-6 py-3 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-xl font-medium transition-all"
+                >
+                  Add Table Manually
+                </button>
+              </div>
             </div>
           </div>
         </div>

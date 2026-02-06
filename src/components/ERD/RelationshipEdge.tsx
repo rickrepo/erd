@@ -83,6 +83,7 @@ function RelationshipEdge({
 
   // Generate unique gradient ID for this edge
   const gradientId = `gradient-${id}`;
+  const animatedGradientId = `animated-gradient-${id}`;
 
   // Calculate gradient direction based on source/target positions
   const isLeftToRight = targetX >= sourceX;
@@ -98,12 +99,16 @@ function RelationshipEdge({
   const pathLength = 1000;
   const dashOffset = pathLength * (1 - animationProgress);
 
+  // Calculate animated gradient stops - color transitions from source to target as it travels
+  const animatedStop1 = `${Math.max(0, animationProgress * 100 - 20)}%`;
+  const animatedStop2 = `${Math.min(100, animationProgress * 100 + 10)}%`;
+
   return (
     <>
       {/* SVG Gradient Definition */}
       <svg style={{ position: 'absolute', width: 0, height: 0 }}>
         <defs>
-          {/* Clean gradient from source table color to target table color */}
+          {/* Static gradient from source table color to target table color */}
           <linearGradient
             id={gradientId}
             x1={isLeftToRight ? '0%' : '100%'}
@@ -112,6 +117,19 @@ function RelationshipEdge({
             y2="0%"
           >
             <stop offset="0%" stopColor={sourceColor} />
+            <stop offset="100%" stopColor={targetColor} />
+          </linearGradient>
+          {/* Animated gradient - color travels from source to target */}
+          <linearGradient
+            id={animatedGradientId}
+            x1={isLeftToRight ? '0%' : '100%'}
+            y1="0%"
+            x2={isLeftToRight ? '100%' : '0%'}
+            y2="0%"
+          >
+            <stop offset="0%" stopColor={sourceColor} />
+            <stop offset={animatedStop1} stopColor={sourceColor} />
+            <stop offset={animatedStop2} stopColor={targetColor} />
             <stop offset="100%" stopColor={targetColor} />
           </linearGradient>
           {/* Arrow marker matching target color */}
@@ -156,13 +174,13 @@ function RelationshipEdge({
         />
       )}
 
-      {/* Animated trail effect */}
+      {/* Animated trail effect with color transition */}
       {isAnimating && !showFullPath && (
         <BaseEdge
           id={`${id}-trail`}
           path={edgePath}
           style={{
-            stroke: isGradient ? `url(#${gradientId})` : sourceColor,
+            stroke: isGradient ? `url(#${animatedGradientId})` : sourceColor,
             strokeWidth: strokeWidth + 3,
             strokeLinecap: 'round',
             strokeDasharray: pathLength,
@@ -173,13 +191,15 @@ function RelationshipEdge({
         />
       )}
 
-      {/* Main edge */}
+      {/* Main edge - use animated gradient during animation, static when done */}
       <BaseEdge
         id={id}
         path={edgePath}
         style={{
           ...style,
-          stroke: isGradient ? `url(#${gradientId})` : sourceColor,
+          stroke: isGradient
+            ? (isAnimating && !showFullPath ? `url(#${animatedGradientId})` : `url(#${gradientId})`)
+            : sourceColor,
           strokeWidth,
           strokeLinecap: 'round',
           strokeDasharray: isAnimating && !showFullPath ? pathLength : undefined,
