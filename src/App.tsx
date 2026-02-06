@@ -254,7 +254,13 @@ const AppContent: React.FC = () => {
         {/* Desktop layout */}
         {!isMobile && (
           <>
-            <Sidebar />
+            <Sidebar
+              activeRelationships={activeRelationships}
+              onToggleRelationship={handleToggleRelationship}
+              onShowAll={handleShowAll}
+              onHideAll={handleHideAll}
+              onAnimateChain={handleAnimateChain}
+            />
             <div className="flex-1 relative">
               <ERDCanvas
                 activeRelationships={activeRelationships}

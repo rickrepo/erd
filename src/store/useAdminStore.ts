@@ -207,115 +207,225 @@ const calculateStats = (users: AdminUser[], logs: ActivityLog[]): AdminStats => 
 const createDefaultDemoQueries = (): DemoQuery[] => [
   {
     id: 'demo-1',
-    name: 'E-Commerce Orders',
-    description: 'Order summary with customer details and shipping info',
-    sql: `-- E-Commerce Order Report
+    name: 'Sales Dashboard Reports',
+    description: 'Order analytics, revenue tracking, and customer insights',
+    sql: `-- SCENARIO 1: Sales Dashboard Reports
+-- These queries power the main sales dashboard
+
+-- Query 1: Order Summary with Customer Details
 SELECT
     o.order_number,
-    o.created_at AS order_date,
-    u.email AS customer_email,
-    u.first_name || ' ' || u.last_name AS customer_name,
-    a.city || ', ' || a.country AS shipping_location,
+    o.created_at,
+    o.status,
     o.total_amount,
-    o.status
+    u.username,
+    u.email,
+    u.first_name,
+    u.last_name
 FROM orders o
 JOIN users u ON o.user_id = u.id
+ORDER BY o.created_at DESC;
+
+-- Query 2: Order with Shipping Address
+SELECT
+    o.order_number,
+    o.total_amount,
+    a.street_address,
+    a.city,
+    a.state,
+    a.postal_code,
+    a.country
+FROM orders o
 JOIN addresses a ON o.shipping_address_id = a.id
-WHERE o.created_at >= '2024-01-01'
-ORDER BY o.created_at DESC;`,
+WHERE o.status = 'shipped';
+
+-- Query 3: Daily Revenue Summary
+SELECT
+    DATE(o.created_at) AS order_date,
+    COUNT(*) AS order_count,
+    SUM(o.total_amount) AS daily_revenue
+FROM orders o
+GROUP BY DATE(o.created_at)
+ORDER BY order_date DESC;`,
     isActive: true,
     order: 0,
   },
   {
     id: 'demo-2',
-    name: 'Product Sales Analysis',
-    description: 'Sales performance by product and category',
-    sql: `-- Product Sales Analysis
+    name: 'Product Catalog Management',
+    description: 'Product listings, categories, and inventory reports',
+    sql: `-- SCENARIO 2: Product Catalog Management
+-- Queries for managing products and categories
+
+-- Query 1: Products by Category
 SELECT
     p.name AS product_name,
-    c.name AS category,
-    SUM(oi.quantity) AS total_sold,
-    SUM(oi.quantity * oi.unit_price) AS revenue
-FROM order_items oi
-JOIN products p ON oi.product_id = p.id
+    p.sku,
+    p.price,
+    p.stock_quantity,
+    c.name AS category_name
+FROM products p
 JOIN categories c ON p.category_id = c.id
-JOIN orders o ON oi.order_id = o.id
-WHERE o.status = 'completed'
-GROUP BY p.id, p.name, c.name
-ORDER BY revenue DESC;`,
+WHERE p.is_active = true
+ORDER BY c.name, p.name;
+
+-- Query 2: Category Hierarchy
+SELECT
+    child.name AS subcategory,
+    parent.name AS parent_category
+FROM categories child
+LEFT JOIN categories parent ON child.parent_id = parent.id
+ORDER BY parent.name, child.name;
+
+-- Query 3: Low Stock Alert
+SELECT
+    p.name,
+    p.sku,
+    p.stock_quantity,
+    c.name AS category
+FROM products p
+JOIN categories c ON p.category_id = c.id
+WHERE p.stock_quantity < 10
+  AND p.is_active = true
+ORDER BY p.stock_quantity ASC;`,
     isActive: true,
     order: 1,
   },
   {
     id: 'demo-3',
-    name: 'Customer Lifetime Value',
-    description: 'Customer order history and spending patterns',
-    sql: `-- Customer Lifetime Value
+    name: 'Order Line Items Analysis',
+    description: 'Detailed order breakdown with products and pricing',
+    sql: `-- SCENARIO 3: Order Line Items Analysis
+-- Understanding what customers are buying
+
+-- Query 1: Order Details with Items
 SELECT
-    u.username,
-    u.email,
-    COUNT(DISTINCT o.id) AS total_orders,
-    SUM(o.total_amount) AS lifetime_value,
-    AVG(o.total_amount) AS avg_order_value,
-    MAX(o.created_at) AS last_order_date
-FROM users u
-LEFT JOIN orders o ON u.id = o.user_id
-GROUP BY u.id, u.username, u.email
-HAVING COUNT(o.id) > 0
-ORDER BY lifetime_value DESC;`,
+    o.order_number,
+    p.name AS product_name,
+    oi.quantity,
+    oi.unit_price,
+    oi.discount,
+    (oi.quantity * oi.unit_price - COALESCE(oi.discount, 0)) AS line_total
+FROM orders o
+JOIN order_items oi ON oi.order_id = o.id
+JOIN products p ON oi.product_id = p.id
+ORDER BY o.order_number;
+
+-- Query 2: Best Selling Products
+SELECT
+    p.name,
+    p.sku,
+    SUM(oi.quantity) AS total_sold,
+    SUM(oi.quantity * oi.unit_price) AS total_revenue
+FROM order_items oi
+JOIN products p ON oi.product_id = p.id
+GROUP BY p.id, p.name, p.sku
+ORDER BY total_sold DESC;
+
+-- Query 3: Product Performance by Category
+SELECT
+    c.name AS category,
+    COUNT(DISTINCT p.id) AS product_count,
+    SUM(oi.quantity) AS units_sold
+FROM order_items oi
+JOIN products p ON oi.product_id = p.id
+JOIN categories c ON p.category_id = c.id
+GROUP BY c.id, c.name
+ORDER BY units_sold DESC;`,
     isActive: true,
     order: 2,
   },
   {
     id: 'demo-4',
-    name: 'Inventory Status',
-    description: 'Product stock levels with category breakdown',
-    sql: `-- Inventory Status Report
+    name: 'Customer Address Book',
+    description: 'User profiles with shipping addresses',
+    sql: `-- SCENARIO 4: Customer Address Book
+-- Managing user profiles and addresses
+
+-- Query 1: Users with Addresses
 SELECT
-    c.name AS category,
-    p.name AS product,
-    p.sku,
-    p.stock_quantity,
-    p.price,
-    CASE
-        WHEN p.stock_quantity = 0 THEN 'Out of Stock'
-        WHEN p.stock_quantity < 10 THEN 'Low Stock'
-        ELSE 'In Stock'
-    END AS stock_status
-FROM products p
-JOIN categories c ON p.category_id = c.id
-WHERE p.is_active = true
-ORDER BY p.stock_quantity ASC;`,
+    u.username,
+    u.email,
+    u.first_name,
+    u.last_name,
+    a.label,
+    a.street_address,
+    a.city,
+    a.country,
+    a.is_default
+FROM users u
+JOIN addresses a ON a.user_id = u.id
+ORDER BY u.username, a.is_default DESC;
+
+-- Query 2: Users with Order History
+SELECT
+    u.username,
+    u.email,
+    COUNT(o.id) AS total_orders,
+    SUM(o.total_amount) AS lifetime_value,
+    MAX(o.created_at) AS last_order
+FROM users u
+LEFT JOIN orders o ON o.user_id = u.id
+GROUP BY u.id, u.username, u.email
+ORDER BY lifetime_value DESC;
+
+-- Query 3: Shipping Destinations
+SELECT
+    a.country,
+    a.city,
+    COUNT(DISTINCT a.user_id) AS customer_count
+FROM addresses a
+GROUP BY a.country, a.city
+ORDER BY customer_count DESC;`,
     isActive: true,
     order: 3,
   },
   {
     id: 'demo-5',
-    name: 'Full Schema Overview',
-    description: 'Complete e-commerce data model with all relationships',
-    sql: `-- Full E-Commerce Schema Overview
--- Order Details with All Relationships
+    name: 'Full E-Commerce Overview',
+    description: 'Complete data model with all table relationships',
+    sql: `-- SCENARIO 5: Full E-Commerce Overview
+-- Complete picture of the data model
+
+-- Query 1: Complete Order View
 SELECT
     o.order_number,
+    o.status,
+    o.total_amount,
     u.username AS customer,
     u.email,
-    a.street_address,
-    a.city,
-    a.country,
+    a.city AS ship_to_city,
+    a.country AS ship_to_country
+FROM orders o
+JOIN users u ON o.user_id = u.id
+JOIN addresses a ON o.shipping_address_id = a.id;
+
+-- Query 2: Order Items with Full Details
+SELECT
+    o.order_number,
+    u.username,
     p.name AS product,
     c.name AS category,
     oi.quantity,
-    oi.unit_price,
-    o.total_amount,
-    o.status
+    oi.unit_price
 FROM orders o
 JOIN users u ON o.user_id = u.id
-JOIN addresses a ON o.shipping_address_id = a.id
 JOIN order_items oi ON oi.order_id = o.id
 JOIN products p ON oi.product_id = p.id
-JOIN categories c ON p.category_id = c.id
-ORDER BY o.created_at DESC
-LIMIT 100;`,
+JOIN categories c ON p.category_id = c.id;
+
+-- Query 3: Customer 360 View
+SELECT
+    u.username,
+    u.first_name,
+    u.last_name,
+    COUNT(DISTINCT o.id) AS orders,
+    COUNT(DISTINCT a.id) AS addresses,
+    SUM(o.total_amount) AS total_spent
+FROM users u
+LEFT JOIN orders o ON o.user_id = u.id
+LEFT JOIN addresses a ON a.user_id = u.id
+GROUP BY u.id, u.username, u.first_name, u.last_name;`,
     isActive: true,
     order: 4,
   },
