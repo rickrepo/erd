@@ -352,6 +352,7 @@ const AppContent: React.FC = () => {
                   onAnimateChain={handleAnimateChain}
                   edgeStyle={edgeStyle}
                   onEdgeStyleChange={setEdgeStyle}
+                  onSwitchToCanvas={() => setMobilePanel('canvas')}
                 />
               </div>
             </div>
@@ -360,9 +361,11 @@ const AppContent: React.FC = () => {
             <div className="flex-shrink-0 bg-slate-900/95 border-t border-slate-800 px-3 py-1">
               <div className="flex items-center justify-between text-[10px]">
                 <span className="text-slate-500">
+                  Made with <span className="text-purple-400 font-medium">SchemaFlow</span>
+                  <span className="text-slate-600 mx-1">·</span>
                   Built by <span className="text-purple-400 font-medium">Ricky</span>
                 </span>
-                <span className="text-slate-600">v2.1.5</span>
+                <span className="text-slate-600">v2.1.6</span>
               </div>
             </div>
 
@@ -426,7 +429,7 @@ const AppContent: React.FC = () => {
 
       {/* Mobile Actions FAB */}
       {isMobile && (
-        <MobileActions onShowSql={() => setMobilePanel('sidebar')} />
+        <MobileActions onShowSql={() => setMobilePanel('sidebar')} currentPanel={mobilePanel} />
       )}
 
       {/* Version Footer - desktop only (mobile has its own bottom nav) */}

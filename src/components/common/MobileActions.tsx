@@ -7,9 +7,14 @@ import { getTableColor } from '../../utils/sqlParser';
 
 interface MobileActionsProps {
   onShowSql: () => void;
+  currentPanel?: 'sidebar' | 'canvas' | 'joins';
 }
 
-export function MobileActions({ onShowSql }: MobileActionsProps) {
+export function MobileActions({ onShowSql, currentPanel = 'canvas' }: MobileActionsProps) {
+  // Only show FAB on canvas view
+  if (currentPanel !== 'canvas') {
+    return null;
+  }
   const [isOpen, setIsOpen] = useState(false);
   const [showAddTable, setShowAddTable] = useState(false);
   const [showSaveSession, setShowSaveSession] = useState(false);

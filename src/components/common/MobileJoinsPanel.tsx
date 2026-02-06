@@ -26,6 +26,7 @@ interface MobileJoinsPanelProps {
   onAnimateChain: (startRelId: string) => void;
   edgeStyle?: 'gradient' | 'flat';
   onEdgeStyleChange?: (style: 'gradient' | 'flat') => void;
+  onSwitchToCanvas?: () => void;
 }
 
 export const MobileJoinsPanel: React.FC<MobileJoinsPanelProps> = ({
@@ -36,6 +37,7 @@ export const MobileJoinsPanel: React.FC<MobileJoinsPanelProps> = ({
   onAnimateChain,
   edgeStyle = 'gradient',
   onEdgeStyleChange,
+  onSwitchToCanvas,
 }) => {
   const { tables, relationships, loadDemo } = useStore();
   const { getCurrentDemoQuery, cycleToNextDemo } = useAdminStore();
@@ -290,7 +292,14 @@ export const MobileJoinsPanel: React.FC<MobileJoinsPanelProps> = ({
                   }}
                 >
                   <button
-                    onClick={() => onToggleRelationship(rel.id)}
+                    onClick={() => {
+                      const wasActive = activeRelationships.has(rel.id);
+                      onToggleRelationship(rel.id);
+                      // Switch to canvas when activating a join
+                      if (!wasActive && onSwitchToCanvas) {
+                        onSwitchToCanvas();
+                      }
+                    }}
                     className="w-full p-3 text-left"
                   >
                     <div className="flex items-center gap-3">
