@@ -13,7 +13,7 @@ import { ToastContainer, toast } from './components/common/Toast';
 import { useStore } from './store/useStore';
 import { useAuthStore } from './store/useAuthStore';
 import { useAdminStore } from './store/useAdminStore';
-import { DEMO_TABLES, DEMO_RELATIONSHIPS, DEMO_SQL_QUERIES } from './utils/demoData';
+import { DEMO_TABLES, DEMO_RELATIONSHIPS } from './utils/demoData';
 import { GitBranch, Code, Link } from 'lucide-react';
 import { MobileJoinsPanel } from './components/common/MobileJoinsPanel';
 import { VersionFooter } from './components/common/VersionFooter';
@@ -32,7 +32,7 @@ const AppContent: React.FC = () => {
     setShowAuthPage,
     isAdmin,
   } = useAuthStore();
-  const { showAdminPanel, setShowAdminPanel } = useAdminStore();
+  const { showAdminPanel, setShowAdminPanel, getCurrentDemoQuery, cycleToNextDemo } = useAdminStore();
 
   const [mobilePanel, setMobilePanel] = useState<MobilePanel>('canvas');
   const [isMobile, setIsMobile] = useState(false);
@@ -83,10 +83,15 @@ const AppContent: React.FC = () => {
   }, []);
 
   const handleLoadDemo = useCallback(() => {
-    loadDemo(DEMO_TABLES, DEMO_RELATIONSHIPS, DEMO_SQL_QUERIES);
-    toast.success('Demo loaded!', 'E-commerce schema has been loaded');
+    const currentQuery = getCurrentDemoQuery();
+    const sql = currentQuery?.sql || '-- No demo queries configured';
+    const queryName = currentQuery?.name || 'E-commerce schema';
+
+    loadDemo(DEMO_TABLES, DEMO_RELATIONSHIPS, sql);
+    toast.success('Demo loaded!', queryName);
+    cycleToNextDemo(); // Advance to next query for next time
     if (isMobile) setMobilePanel('canvas');
-  }, [loadDemo, isMobile]);
+  }, [loadDemo, isMobile, getCurrentDemoQuery, cycleToNextDemo]);
 
   const handleStartFresh = useCallback(() => {
     reset();

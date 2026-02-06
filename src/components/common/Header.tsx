@@ -4,20 +4,25 @@ import { useAuthStore } from '../../store/useAuthStore';
 import { useStore } from '../../store/useStore';
 import { useAdminStore } from '../../store/useAdminStore';
 import { Branding } from './Branding';
-import { DEMO_TABLES, DEMO_RELATIONSHIPS, DEMO_SQL_QUERIES } from '../../utils/demoData';
+import { DEMO_TABLES, DEMO_RELATIONSHIPS } from '../../utils/demoData';
 import { toast } from './Toast';
 import { APP_VERSION } from './VersionFooter';
 
 export function Header() {
   const { user, subscription, logout, setShowAuthPage, setShowPremiumModal, isAdmin } = useAuthStore();
   const { tables, loadDemo, reset } = useStore();
-  const { setShowAdminPanel } = useAdminStore();
+  const { setShowAdminPanel, getCurrentDemoQuery, cycleToNextDemo } = useAdminStore();
   const [showDropdown, setShowDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const handleLoadDemo = () => {
-    loadDemo(DEMO_TABLES, DEMO_RELATIONSHIPS, DEMO_SQL_QUERIES);
-    toast.success('Demo loaded!', 'E-commerce schema with sample SQL queries');
+    const currentQuery = getCurrentDemoQuery();
+    const sql = currentQuery?.sql || '-- No demo queries configured';
+    const queryName = currentQuery?.name || 'E-commerce schema';
+
+    loadDemo(DEMO_TABLES, DEMO_RELATIONSHIPS, sql);
+    toast.success('Demo loaded!', queryName);
+    cycleToNextDemo();
   };
 
   const handleClear = () => {

@@ -12,6 +12,15 @@ export interface ActivityLog {
   metadata?: Record<string, unknown>;
 }
 
+export interface DemoQuery {
+  id: string;
+  name: string;
+  description: string;
+  sql: string;
+  isActive: boolean;
+  order: number;
+}
+
 export interface AdminUser extends User {
   subscription: SubscriptionTier;
   generationsToday: number;
@@ -36,6 +45,8 @@ interface AdminStore {
   users: AdminUser[];
   activityLogs: ActivityLog[];
   stats: AdminStats;
+  demoQueries: DemoQuery[];
+  currentDemoIndex: number;
 
   // Actions
   setIsAdmin: (isAdmin: boolean) => void;
@@ -44,6 +55,15 @@ interface AdminStore {
   updateUserSubscription: (userId: string, tier: SubscriptionTier) => void;
   deleteUser: (userId: string) => void;
   refreshStats: () => void;
+
+  // Demo query management
+  addDemoQuery: (query: Omit<DemoQuery, 'id' | 'order'>) => void;
+  updateDemoQuery: (id: string, updates: Partial<Omit<DemoQuery, 'id'>>) => void;
+  deleteDemoQuery: (id: string) => void;
+  reorderDemoQueries: (queries: DemoQuery[]) => void;
+  getActiveDemoQueries: () => DemoQuery[];
+  getCurrentDemoQuery: () => DemoQuery | null;
+  cycleToNextDemo: () => void;
 
   // Demo data
   loadDemoData: () => void;
@@ -184,6 +204,123 @@ const calculateStats = (users: AdminUser[], logs: ActivityLog[]): AdminStats => 
   };
 };
 
+const createDefaultDemoQueries = (): DemoQuery[] => [
+  {
+    id: 'demo-1',
+    name: 'E-Commerce Orders',
+    description: 'Order summary with customer details and shipping info',
+    sql: `-- E-Commerce Order Report
+SELECT
+    o.order_number,
+    o.created_at AS order_date,
+    u.email AS customer_email,
+    u.first_name || ' ' || u.last_name AS customer_name,
+    a.city || ', ' || a.country AS shipping_location,
+    o.total_amount,
+    o.status
+FROM orders o
+JOIN users u ON o.user_id = u.id
+JOIN addresses a ON o.shipping_address_id = a.id
+WHERE o.created_at >= '2024-01-01'
+ORDER BY o.created_at DESC;`,
+    isActive: true,
+    order: 0,
+  },
+  {
+    id: 'demo-2',
+    name: 'Product Sales Analysis',
+    description: 'Sales performance by product and category',
+    sql: `-- Product Sales Analysis
+SELECT
+    p.name AS product_name,
+    c.name AS category,
+    SUM(oi.quantity) AS total_sold,
+    SUM(oi.quantity * oi.unit_price) AS revenue
+FROM order_items oi
+JOIN products p ON oi.product_id = p.id
+JOIN categories c ON p.category_id = c.id
+JOIN orders o ON oi.order_id = o.id
+WHERE o.status = 'completed'
+GROUP BY p.id, p.name, c.name
+ORDER BY revenue DESC;`,
+    isActive: true,
+    order: 1,
+  },
+  {
+    id: 'demo-3',
+    name: 'Customer Lifetime Value',
+    description: 'Customer order history and spending patterns',
+    sql: `-- Customer Lifetime Value
+SELECT
+    u.username,
+    u.email,
+    COUNT(DISTINCT o.id) AS total_orders,
+    SUM(o.total_amount) AS lifetime_value,
+    AVG(o.total_amount) AS avg_order_value,
+    MAX(o.created_at) AS last_order_date
+FROM users u
+LEFT JOIN orders o ON u.id = o.user_id
+GROUP BY u.id, u.username, u.email
+HAVING COUNT(o.id) > 0
+ORDER BY lifetime_value DESC;`,
+    isActive: true,
+    order: 2,
+  },
+  {
+    id: 'demo-4',
+    name: 'Inventory Status',
+    description: 'Product stock levels with category breakdown',
+    sql: `-- Inventory Status Report
+SELECT
+    c.name AS category,
+    p.name AS product,
+    p.sku,
+    p.stock_quantity,
+    p.price,
+    CASE
+        WHEN p.stock_quantity = 0 THEN 'Out of Stock'
+        WHEN p.stock_quantity < 10 THEN 'Low Stock'
+        ELSE 'In Stock'
+    END AS stock_status
+FROM products p
+JOIN categories c ON p.category_id = c.id
+WHERE p.is_active = true
+ORDER BY p.stock_quantity ASC;`,
+    isActive: true,
+    order: 3,
+  },
+  {
+    id: 'demo-5',
+    name: 'Full Schema Overview',
+    description: 'Complete e-commerce data model with all relationships',
+    sql: `-- Full E-Commerce Schema Overview
+-- Order Details with All Relationships
+SELECT
+    o.order_number,
+    u.username AS customer,
+    u.email,
+    a.street_address,
+    a.city,
+    a.country,
+    p.name AS product,
+    c.name AS category,
+    oi.quantity,
+    oi.unit_price,
+    o.total_amount,
+    o.status
+FROM orders o
+JOIN users u ON o.user_id = u.id
+JOIN addresses a ON o.shipping_address_id = a.id
+JOIN order_items oi ON oi.order_id = o.id
+JOIN products p ON oi.product_id = p.id
+JOIN categories c ON p.category_id = c.id
+ORDER BY o.created_at DESC
+LIMIT 100;`,
+    isActive: true,
+    order: 4,
+  },
+];
+
 export const useAdminStore = create<AdminStore>()(
   persist(
     (set, get) => ({
@@ -200,6 +337,8 @@ export const useAdminStore = create<AdminStore>()(
         proSubscribers: 0,
         enterpriseSubscribers: 0,
       },
+      demoQueries: createDefaultDemoQueries(),
+      currentDemoIndex: 0,
 
       // Actions
       setIsAdmin: (isAdmin) => set({ isAdmin }),
@@ -253,11 +392,72 @@ export const useAdminStore = create<AdminStore>()(
         set({ stats: calculateStats(users, activityLogs) });
       },
 
+      // Demo query management
+      addDemoQuery: (query) => {
+        const { demoQueries } = get();
+        const newQuery: DemoQuery = {
+          ...query,
+          id: generateId(),
+          order: demoQueries.length,
+        };
+        set({ demoQueries: [...demoQueries, newQuery] });
+      },
+
+      updateDemoQuery: (id, updates) => {
+        const { demoQueries } = get();
+        set({
+          demoQueries: demoQueries.map(q =>
+            q.id === id ? { ...q, ...updates } : q
+          ),
+        });
+      },
+
+      deleteDemoQuery: (id) => {
+        const { demoQueries, currentDemoIndex } = get();
+        const newQueries = demoQueries.filter(q => q.id !== id);
+        // Reorder remaining queries
+        const reorderedQueries = newQueries.map((q, idx) => ({ ...q, order: idx }));
+        // Adjust current index if needed
+        const activeQueries = reorderedQueries.filter(q => q.isActive);
+        const newIndex = currentDemoIndex >= activeQueries.length ? 0 : currentDemoIndex;
+        set({ demoQueries: reorderedQueries, currentDemoIndex: newIndex });
+      },
+
+      reorderDemoQueries: (queries) => {
+        set({ demoQueries: queries.map((q, idx) => ({ ...q, order: idx })) });
+      },
+
+      getActiveDemoQueries: () => {
+        const { demoQueries } = get();
+        return demoQueries
+          .filter(q => q.isActive)
+          .sort((a, b) => a.order - b.order);
+      },
+
+      getCurrentDemoQuery: () => {
+        const { demoQueries, currentDemoIndex } = get();
+        const activeQueries = demoQueries
+          .filter(q => q.isActive)
+          .sort((a, b) => a.order - b.order);
+        if (activeQueries.length === 0) return null;
+        return activeQueries[currentDemoIndex % activeQueries.length];
+      },
+
+      cycleToNextDemo: () => {
+        const { demoQueries, currentDemoIndex } = get();
+        const activeQueries = demoQueries.filter(q => q.isActive);
+        if (activeQueries.length === 0) return;
+        set({ currentDemoIndex: (currentDemoIndex + 1) % activeQueries.length });
+      },
+
       loadDemoData: () => {
         const users = createDemoUsers();
         const logs = createDemoLogs(users);
         const stats = calculateStats(users, logs);
-        set({ users, activityLogs: logs, stats, isAdmin: true });
+        // Initialize demo queries if empty
+        const { demoQueries } = get();
+        const queries = demoQueries.length === 0 ? createDefaultDemoQueries() : demoQueries;
+        set({ users, activityLogs: logs, stats, isAdmin: true, demoQueries: queries });
       },
     }),
     {
@@ -266,6 +466,8 @@ export const useAdminStore = create<AdminStore>()(
         isAdmin: state.isAdmin,
         users: state.users,
         activityLogs: state.activityLogs,
+        demoQueries: state.demoQueries,
+        currentDemoIndex: state.currentDemoIndex,
       }),
     }
   )

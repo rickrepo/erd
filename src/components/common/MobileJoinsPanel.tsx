@@ -12,7 +12,8 @@ import {
   Database,
 } from 'lucide-react';
 import { useStore } from '../../store/useStore';
-import { DEMO_TABLES, DEMO_RELATIONSHIPS, DEMO_SQL_QUERIES } from '../../utils/demoData';
+import { DEMO_TABLES, DEMO_RELATIONSHIPS } from '../../utils/demoData';
+import { useAdminStore } from '../../store/useAdminStore';
 import { toast } from './Toast';
 
 interface MobileJoinsPanelProps {
@@ -31,13 +32,19 @@ export const MobileJoinsPanel: React.FC<MobileJoinsPanelProps> = ({
   onAnimateChain,
 }) => {
   const { tables, relationships, loadDemo } = useStore();
+  const { getCurrentDemoQuery, cycleToNextDemo } = useAdminStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterTable, setFilterTable] = useState<string | null>(null);
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
 
   const handleLoadDemo = () => {
-    loadDemo(DEMO_TABLES, DEMO_RELATIONSHIPS, DEMO_SQL_QUERIES);
-    toast.success('Demo loaded!', 'E-commerce schema with sample SQL');
+    const currentQuery = getCurrentDemoQuery();
+    const sql = currentQuery?.sql || '-- No demo queries configured';
+    const queryName = currentQuery?.name || 'E-commerce schema';
+
+    loadDemo(DEMO_TABLES, DEMO_RELATIONSHIPS, sql);
+    toast.success('Demo loaded!', queryName);
+    cycleToNextDemo();
   };
 
   // Filter relationships based on search and table filter

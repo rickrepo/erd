@@ -7,6 +7,12 @@ import {
   CheckCircle,
   Table as TableIcon,
   Link,
+  Plus,
+  Trash2,
+  Copy,
+  Edit3,
+  FileText,
+  ChevronRight,
 } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import type { SQLDialect } from '../../store/useStore';
@@ -47,6 +53,53 @@ function isValidTableName(name: string): boolean {
   return true;
 }
 
+interface SQLQuery {
+  id: string;
+  name: string;
+  sql: string;
+}
+
+// Split SQL input into separate queries
+function splitSQLQueries(sql: string): string[] {
+  // First check if it's CREATE TABLE statements
+  if (/CREATE\s+(TABLE|VIEW|PROCEDURE|FUNCTION)/i.test(sql)) {
+    return [sql]; // Return as single block for CREATE statements
+  }
+
+  // Split by SELECT (keeping the SELECT keyword)
+  const queries: string[] = [];
+  const parts = sql.split(/(?=\bSELECT\b)/gi);
+
+  for (const part of parts) {
+    const trimmed = part.trim();
+    if (trimmed && /^SELECT\b/i.test(trimmed)) {
+      queries.push(trimmed);
+    } else if (trimmed && queries.length === 0) {
+      // Handle any preamble (comments, etc.)
+      queries.push(trimmed);
+    }
+  }
+
+  return queries.filter(q => q.trim().length > 0);
+}
+
+// Extract a name from a SQL query (first table or comment)
+function extractQueryName(sql: string): string {
+  // Check for a comment at the start
+  const commentMatch = sql.match(/^--\s*(.+?)(?:\n|$)/);
+  if (commentMatch) {
+    return commentMatch[1].trim().substring(0, 40);
+  }
+
+  // Try to extract from first FROM clause
+  const fromMatch = sql.match(/FROM\s+([a-zA-Z_][a-zA-Z0-9_]*)/i);
+  if (fromMatch) {
+    return `Query: ${fromMatch[1]}`;
+  }
+
+  return 'SQL Query';
+}
+
 interface SidebarProps {
   // Props no longer needed - joins managed in Joins tab
 }
@@ -65,20 +118,37 @@ const Sidebar: React.FC<SidebarProps> = () => {
 
   // SQL input expanded by default when no tables
   const [sqlExpanded, setSqlExpanded] = useState(tables.length === 0);
-  const [sqlInput, setSqlInputLocal] = useState('');
+  const [sqlQueries, setSqlQueries] = useState<SQLQuery[]>([]);
+  const [newQueryInput, setNewQueryInput] = useState('');
+  const [showAddQuery, setShowAddQuery] = useState(false);
+  const [editingQueryId, setEditingQueryId] = useState<string | null>(null);
+  const [editingQuerySql, setEditingQuerySql] = useState('');
+  const [showCombinedView, setShowCombinedView] = useState(false);
 
   // Sync local SQL input with store (for demo mode)
   useEffect(() => {
-    if (storeSqlInput && !sqlInput) {
-      setSqlInputLocal(storeSqlInput);
+    if (storeSqlInput && sqlQueries.length === 0) {
+      // Split store SQL into separate queries
+      const split = splitSQLQueries(storeSqlInput);
+      if (split.length > 0) {
+        const newQueries = split.map((sql, idx) => ({
+          id: `query-${Date.now()}-${idx}`,
+          name: extractQueryName(sql),
+          sql,
+        }));
+        setSqlQueries(newQueries);
+      }
     }
   }, [storeSqlInput]);
 
-  // Update both local state and store
-  const setSqlInput = (value: string) => {
-    setSqlInputLocal(value);
-    setStoreSqlInput(value);
-  };
+  // Update store when queries change
+  useEffect(() => {
+    const combined = sqlQueries.map(q => q.sql).join('\n\n');
+    if (combined !== storeSqlInput) {
+      setStoreSqlInput(combined);
+    }
+  }, [sqlQueries, setStoreSqlInput, storeSqlInput]);
+
   const [showDialectDropdown, setShowDialectDropdown] = useState(false);
   const dialectDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -102,7 +172,51 @@ const Sidebar: React.FC<SidebarProps> = () => {
 
   const currentDialect = DIALECT_OPTIONS.find(d => d.id === sqlDialect) || DIALECT_OPTIONS[0];
 
+  const handleAddQuery = () => {
+    if (!newQueryInput.trim()) return;
+
+    // Split the input into multiple queries
+    const split = splitSQLQueries(newQueryInput);
+    const newQueries = split.map((sql, idx) => ({
+      id: `query-${Date.now()}-${idx}`,
+      name: extractQueryName(sql),
+      sql,
+    }));
+
+    setSqlQueries(prev => [...prev, ...newQueries]);
+    setNewQueryInput('');
+    setShowAddQuery(false);
+
+    toast.success('Query added', `Added ${newQueries.length} query${newQueries.length !== 1 ? 'ies' : ''}`);
+  };
+
+  const handleRemoveQuery = (id: string) => {
+    setSqlQueries(prev => prev.filter(q => q.id !== id));
+  };
+
+  const handleUpdateQuery = (id: string) => {
+    if (!editingQuerySql.trim()) return;
+
+    setSqlQueries(prev =>
+      prev.map(q =>
+        q.id === id
+          ? { ...q, sql: editingQuerySql, name: extractQueryName(editingQuerySql) }
+          : q
+      )
+    );
+    setEditingQueryId(null);
+    setEditingQuerySql('');
+  };
+
+  const handleCopyQuery = (sql: string) => {
+    navigator.clipboard.writeText(sql);
+    toast.info('Copied', 'SQL copied to clipboard');
+  };
+
+  const getCombinedSQL = () => sqlQueries.map(q => q.sql).join('\n\n');
+
   const handleParseSQL = () => {
+    const sqlInput = getCombinedSQL();
     if (!sqlInput.trim()) return;
 
     try {
@@ -133,7 +247,6 @@ const Sidebar: React.FC<SidebarProps> = () => {
         setTables(validTables);
         setRelationships(rels);
         setSqlExpanded(false);
-        setSqlInput('');
 
         toast.success(
           'Schema imported',
@@ -170,7 +283,6 @@ const Sidebar: React.FC<SidebarProps> = () => {
         setTables(validNewTables);
         setRelationships(joinRels);
         setSqlExpanded(false);
-        setSqlInput('');
 
         toast.success(
           'Query analyzed',
@@ -199,21 +311,18 @@ const Sidebar: React.FC<SidebarProps> = () => {
         >
           <div className="flex items-center gap-2">
             <Database className={`w-4 h-4 ${tables.length === 0 ? 'text-purple-400' : 'text-blue-400'}`} />
-            <span>{tables.length === 0 ? 'Paste Your SQL Here' : 'Import SQL'}</span>
+            <span>{tables.length === 0 ? 'Paste Your SQL Here' : 'SQL Queries'}</span>
+            {sqlQueries.length > 0 && (
+              <span className="px-1.5 py-0.5 bg-purple-500/30 text-purple-300 text-[10px] rounded-full">
+                {sqlQueries.length}
+              </span>
+            )}
           </div>
           {sqlExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
         </button>
 
         {sqlExpanded && (
           <div className="px-3 pb-3 animate-slideIn">
-            {/* Guidance text */}
-            <div className="mb-2 p-2 bg-slate-900/50 rounded-lg border border-slate-700">
-              <p className="text-[10px] text-slate-400 leading-relaxed">
-                <span className="text-purple-400 font-medium">Supported:</span> CREATE TABLE, CREATE VIEW,
-                CREATE PROCEDURE, CREATE FUNCTION, SELECT with JOINs
-              </p>
-            </div>
-
             {/* Dialect Selector */}
             <div className="relative mb-2" ref={dialectDropdownRef}>
               <button
@@ -241,10 +350,163 @@ const Sidebar: React.FC<SidebarProps> = () => {
               )}
             </div>
 
-            <textarea
-              value={sqlInput}
-              onChange={(e) => setSqlInput(e.target.value)}
-              placeholder={`-- Paste your SQL here
+            {/* Combined View Toggle (when multiple queries) */}
+            {sqlQueries.length > 1 && (
+              <button
+                onClick={() => setShowCombinedView(!showCombinedView)}
+                className="w-full mb-2 flex items-center justify-between px-2.5 py-2 bg-slate-900/50 rounded-lg text-xs text-slate-400 hover:bg-slate-900 transition-colors border border-slate-700"
+              >
+                <div className="flex items-center gap-2">
+                  <FileText className="w-3.5 h-3.5" />
+                  <span>Combined SQL ({sqlQueries.length} queries)</span>
+                </div>
+                <ChevronRight className={`w-3.5 h-3.5 transition-transform ${showCombinedView ? 'rotate-90' : ''}`} />
+              </button>
+            )}
+
+            {/* Combined View */}
+            {showCombinedView && sqlQueries.length > 1 && (
+              <div className="mb-3 p-2 bg-slate-900 rounded-lg border border-slate-600">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] text-slate-500 uppercase font-medium">All Queries Combined</span>
+                  <button
+                    onClick={() => handleCopyQuery(getCombinedSQL())}
+                    className="p-1 text-slate-400 hover:text-white transition-colors"
+                    title="Copy all"
+                  >
+                    <Copy className="w-3 h-3" />
+                  </button>
+                </div>
+                <pre className="text-[10px] text-slate-400 font-mono max-h-32 overflow-auto whitespace-pre-wrap">
+                  {getCombinedSQL()}
+                </pre>
+              </div>
+            )}
+
+            {/* Individual Query Cards */}
+            {sqlQueries.length > 0 && (
+              <div className="space-y-2 mb-3 max-h-64 overflow-auto">
+                {sqlQueries.map((query, index) => (
+                  <div
+                    key={query.id}
+                    className="bg-slate-900/50 rounded-lg border border-slate-700 overflow-hidden"
+                  >
+                    {editingQueryId === query.id ? (
+                      <div className="p-2">
+                        <textarea
+                          value={editingQuerySql}
+                          onChange={(e) => setEditingQuerySql(e.target.value)}
+                          className="w-full h-24 bg-slate-800 border border-slate-600 rounded p-2 text-xs text-slate-200 font-mono resize-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
+                          autoFocus
+                        />
+                        <div className="flex justify-end gap-1 mt-2">
+                          <button
+                            onClick={() => setEditingQueryId(null)}
+                            className="px-2 py-1 text-xs text-slate-400 hover:text-white"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            onClick={() => handleUpdateQuery(query.id)}
+                            className="px-2 py-1 text-xs bg-purple-600 hover:bg-purple-500 text-white rounded"
+                          >
+                            Save
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="px-2.5 py-1.5 bg-slate-700/30 flex items-center justify-between">
+                          <span className="text-[10px] text-slate-400 font-medium truncate">
+                            #{index + 1} {query.name}
+                          </span>
+                          <div className="flex items-center gap-0.5">
+                            <button
+                              onClick={() => handleCopyQuery(query.sql)}
+                              className="p-1 text-slate-500 hover:text-white transition-colors"
+                              title="Copy"
+                            >
+                              <Copy className="w-3 h-3" />
+                            </button>
+                            <button
+                              onClick={() => {
+                                setEditingQueryId(query.id);
+                                setEditingQuerySql(query.sql);
+                              }}
+                              className="p-1 text-slate-500 hover:text-white transition-colors"
+                              title="Edit"
+                            >
+                              <Edit3 className="w-3 h-3" />
+                            </button>
+                            <button
+                              onClick={() => handleRemoveQuery(query.id)}
+                              className="p-1 text-slate-500 hover:text-red-400 transition-colors"
+                              title="Remove"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </div>
+                        <pre className="px-2.5 py-2 text-[10px] text-slate-400 font-mono max-h-20 overflow-auto whitespace-pre-wrap">
+                          {query.sql.substring(0, 300)}
+                          {query.sql.length > 300 && '...'}
+                        </pre>
+                      </>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Add Query Form */}
+            {showAddQuery ? (
+              <div className="mb-3">
+                <textarea
+                  value={newQueryInput}
+                  onChange={(e) => setNewQueryInput(e.target.value)}
+                  placeholder={`-- Enter your SQL query
+SELECT * FROM users
+JOIN orders ON users.id = orders.user_id;`}
+                  className="w-full h-28 bg-slate-900 border border-slate-600 rounded-lg p-2.5 text-xs text-slate-200 font-mono resize-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-colors placeholder:text-slate-600"
+                  spellCheck={false}
+                  autoFocus
+                />
+                <div className="flex gap-2 mt-2">
+                  <button
+                    onClick={() => {
+                      setShowAddQuery(false);
+                      setNewQueryInput('');
+                    }}
+                    className="flex-1 py-1.5 text-xs text-slate-400 hover:text-white transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleAddQuery}
+                    disabled={!newQueryInput.trim()}
+                    className={`flex-1 py-1.5 rounded text-xs font-medium transition-all ${
+                      newQueryInput.trim()
+                        ? 'bg-purple-600 hover:bg-purple-500 text-white'
+                        : 'bg-slate-700 text-slate-500 cursor-not-allowed'
+                    }`}
+                  >
+                    Add Query
+                  </button>
+                </div>
+              </div>
+            ) : sqlQueries.length === 0 ? (
+              /* Initial SQL Input when no queries */
+              <div className="mb-3">
+                <div className="mb-2 p-2 bg-slate-900/50 rounded-lg border border-slate-700">
+                  <p className="text-[10px] text-slate-400 leading-relaxed">
+                    <span className="text-purple-400 font-medium">Supported:</span> CREATE TABLE, CREATE VIEW,
+                    CREATE PROCEDURE, SELECT with JOINs
+                  </p>
+                </div>
+                <textarea
+                  value={newQueryInput}
+                  onChange={(e) => setNewQueryInput(e.target.value)}
+                  placeholder={`-- Paste your SQL here
 CREATE TABLE users (
   id INT PRIMARY KEY,
   name VARCHAR(100)
@@ -254,22 +516,43 @@ CREATE TABLE orders (
   id INT PRIMARY KEY,
   user_id INT REFERENCES users(id)
 );`}
-              className="w-full h-32 bg-slate-900 border border-slate-600 rounded-lg p-2.5 text-xs text-slate-200 font-mono resize-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-colors placeholder:text-slate-600"
-              spellCheck={false}
-            />
+                  className="w-full h-32 bg-slate-900 border border-slate-600 rounded-lg p-2.5 text-xs text-slate-200 font-mono resize-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-colors placeholder:text-slate-600"
+                  spellCheck={false}
+                />
+                <button
+                  onClick={handleAddQuery}
+                  disabled={!newQueryInput.trim()}
+                  className={`w-full mt-2 py-2.5 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2 ${
+                    newQueryInput.trim()
+                      ? 'bg-purple-600 hover:bg-purple-500 text-white'
+                      : 'bg-slate-700 text-slate-500 cursor-not-allowed'
+                  }`}
+                >
+                  <Plus className="w-4 h-4" />
+                  Add SQL
+                </button>
+              </div>
+            ) : (
+              /* Add Query Button when queries exist */
+              <button
+                onClick={() => setShowAddQuery(true)}
+                className="w-full mb-3 py-2 rounded-lg text-xs font-medium bg-slate-700/50 hover:bg-slate-700 text-slate-300 transition-colors flex items-center justify-center gap-2 border border-dashed border-slate-600"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Add Another Query
+              </button>
+            )}
 
-            <button
-              onClick={handleParseSQL}
-              disabled={!sqlInput.trim()}
-              className={`w-full mt-2 py-2.5 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2 ${
-                sqlInput.trim()
-                  ? 'bg-purple-600 hover:bg-purple-500 text-white'
-                  : 'bg-slate-700 text-slate-500 cursor-not-allowed'
-              }`}
-            >
-              <Code className="w-4 h-4" />
-              Parse & Visualize
-            </button>
+            {/* Parse Button */}
+            {sqlQueries.length > 0 && (
+              <button
+                onClick={handleParseSQL}
+                className="w-full py-2.5 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-500 text-white"
+              >
+                <Code className="w-4 h-4" />
+                Parse & Visualize ({sqlQueries.length} {sqlQueries.length === 1 ? 'query' : 'queries'})
+              </button>
+            )}
           </div>
         )}
       </div>
