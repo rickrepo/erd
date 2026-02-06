@@ -459,15 +459,27 @@ const ERDCanvas: React.FC<ERDCanvasProps> = ({
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 
-  // Update nodes when layout changes
-  useEffect(() => {
-    setNodes(initialNodes);
-  }, [initialNodes, setNodes]);
+  // Track previous table/relationship IDs to avoid unnecessary updates
+  const prevTableIdsForNodesRef = useRef<string>('');
+  const prevRelIdsForEdgesRef = useRef<string>('');
 
-  // Update edges when relationships change
+  // Update nodes when tables actually change (not just callback references)
   useEffect(() => {
-    setEdges(initialEdges);
-  }, [initialEdges, setEdges]);
+    const currentTableIds = tables.map(t => t.id).sort().join(',');
+    if (currentTableIds !== prevTableIdsForNodesRef.current) {
+      prevTableIdsForNodesRef.current = currentTableIds;
+      setNodes(initialNodes);
+    }
+  }, [initialNodes, setNodes, tables]);
+
+  // Update edges when relationships actually change
+  useEffect(() => {
+    const currentRelIds = relationships.map(r => r.id).sort().join(',');
+    if (currentRelIds !== prevRelIdsForEdgesRef.current) {
+      prevRelIdsForEdgesRef.current = currentRelIds;
+      setEdges(initialEdges);
+    }
+  }, [initialEdges, setEdges, relationships]);
 
   // Update selected state
   useEffect(() => {
