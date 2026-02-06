@@ -6,6 +6,7 @@ import { useAdminStore } from '../../store/useAdminStore';
 import { Branding } from './Branding';
 import { DEMO_TABLES, DEMO_RELATIONSHIPS, DEMO_SQL_QUERIES } from '../../utils/demoData';
 import { toast } from './Toast';
+import { APP_VERSION } from './VersionFooter';
 
 export function Header() {
   const { user, subscription, logout, setShowAuthPage, setShowPremiumModal, isAdmin } = useAuthStore();
@@ -175,6 +176,9 @@ export function Header() {
                     <LogOut className="w-4 h-4" />
                     Sign Out
                   </button>
+                </div>
+                <div className="border-t border-slate-700 mt-1 pt-2 px-3 pb-2">
+                  <span className="text-[10px] text-slate-500">v{APP_VERSION}</span>
                 </div>
               </div>
             )}

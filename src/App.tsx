@@ -364,8 +364,8 @@ const AppContent: React.FC = () => {
         <MobileActions onShowSql={() => setMobilePanel('sidebar')} />
       )}
 
-      {/* Version Footer */}
-      <VersionFooter />
+      {/* Version Footer - desktop only (mobile has its own bottom nav) */}
+      {!isMobile && <VersionFooter />}
 
       {/* Toast Notifications */}
       <ToastContainer />
