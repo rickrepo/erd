@@ -93,6 +93,8 @@ export interface ERDCanvasProps {
   animatingRelationship: string | null;
   setAnimatingRelationship: React.Dispatch<React.SetStateAction<string | null>>;
   hiddenTables?: Set<string>;
+  edgeStyle?: 'gradient' | 'flat';
+  onEdgeStyleChange?: (style: 'gradient' | 'flat') => void;
 }
 
 const ERDCanvas: React.FC<ERDCanvasProps> = ({
@@ -101,6 +103,8 @@ const ERDCanvas: React.FC<ERDCanvasProps> = ({
   animatingRelationship,
   setAnimatingRelationship,
   hiddenTables = new Set(),
+  edgeStyle: propEdgeStyle,
+  onEdgeStyleChange,
 }) => {
   const {
     tables: allTables,
@@ -139,7 +143,10 @@ const ERDCanvas: React.FC<ERDCanvasProps> = ({
 
   const [layoutType, setLayoutType] = useState<LayoutType>('hierarchical');
   const [showExport, setShowExport] = useState(false);
-  const [edgeStyle, setEdgeStyle] = useState<'gradient' | 'flat'>('gradient');
+  // Use prop if provided, otherwise use internal state
+  const [internalEdgeStyle, setInternalEdgeStyle] = useState<'gradient' | 'flat'>('gradient');
+  const edgeStyle = propEdgeStyle ?? internalEdgeStyle;
+  const setEdgeStyle = onEdgeStyleChange ?? setInternalEdgeStyle;
   const { fitView, screenToFlowPosition } = useReactFlow();
 
   // Track if we've done the initial animation

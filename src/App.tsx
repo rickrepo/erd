@@ -41,6 +41,8 @@ const AppContent: React.FC = () => {
   // Active relationships state - lifted to App for sharing between Sidebar and Canvas
   const [activeRelationships, setActiveRelationships] = useState<Set<string>>(new Set());
   const [animatingRelationship, setAnimatingRelationship] = useState<string | null>(null);
+  // Edge style state - lifted to App so mobile can control it
+  const [edgeStyle, setEdgeStyle] = useState<'gradient' | 'flat'>('gradient');
   // hiddenTables feature temporarily disabled - always empty
   const [hiddenTables] = useState<Set<string>>(new Set());
 
@@ -313,6 +315,8 @@ const AppContent: React.FC = () => {
                   animatingRelationship={animatingRelationship}
                   setAnimatingRelationship={setAnimatingRelationship}
                   hiddenTables={hiddenTables}
+                  edgeStyle={edgeStyle}
+                  onEdgeStyleChange={setEdgeStyle}
                 />
               </ERDErrorBoundary>
             </div>
@@ -334,6 +338,8 @@ const AppContent: React.FC = () => {
                     animatingRelationship={animatingRelationship}
                     setAnimatingRelationship={setAnimatingRelationship}
                     hiddenTables={hiddenTables}
+                    edgeStyle={edgeStyle}
+                    onEdgeStyleChange={setEdgeStyle}
                   />
                 </ERDErrorBoundary>
               </div>
@@ -344,7 +350,19 @@ const AppContent: React.FC = () => {
                   onShowAll={handleShowAll}
                   onHideAll={handleHideAll}
                   onAnimateChain={handleAnimateChain}
+                  edgeStyle={edgeStyle}
+                  onEdgeStyleChange={setEdgeStyle}
                 />
+              </div>
+            </div>
+
+            {/* Mobile footer info */}
+            <div className="flex-shrink-0 bg-slate-900/95 border-t border-slate-800 px-3 py-1">
+              <div className="flex items-center justify-between text-[10px]">
+                <span className="text-slate-500">
+                  Built by <span className="text-purple-400 font-medium">Ricky</span>
+                </span>
+                <span className="text-slate-600">v2.1.5</span>
               </div>
             </div>
 

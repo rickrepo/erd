@@ -10,6 +10,8 @@ import {
   ChevronDown,
   Table as TableIcon,
   Database,
+  Palette,
+  Minus,
 } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { DEMO_TABLES, DEMO_RELATIONSHIPS } from '../../utils/demoData';
@@ -22,6 +24,8 @@ interface MobileJoinsPanelProps {
   onShowAll: () => void;
   onHideAll: () => void;
   onAnimateChain: (startRelId: string) => void;
+  edgeStyle?: 'gradient' | 'flat';
+  onEdgeStyleChange?: (style: 'gradient' | 'flat') => void;
 }
 
 export const MobileJoinsPanel: React.FC<MobileJoinsPanelProps> = ({
@@ -30,12 +34,20 @@ export const MobileJoinsPanel: React.FC<MobileJoinsPanelProps> = ({
   onShowAll,
   onHideAll,
   onAnimateChain,
+  edgeStyle = 'gradient',
+  onEdgeStyleChange,
 }) => {
   const { tables, relationships, loadDemo } = useStore();
   const { getCurrentDemoQuery, cycleToNextDemo } = useAdminStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterTable, setFilterTable] = useState<string | null>(null);
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
+
+  // Build table color map
+  const tableColorMap: Record<string, string> = {};
+  tables.forEach((t) => {
+    tableColorMap[t.id] = t.color || '#3b82f6';
+  });
 
   const handleLoadDemo = () => {
     const currentQuery = getCurrentDemoQuery();
@@ -194,6 +206,34 @@ export const MobileJoinsPanel: React.FC<MobileJoinsPanelProps> = ({
                 Hide All
               </button>
             </div>
+
+            {/* Edge Style Toggle */}
+            {onEdgeStyleChange && (
+              <div className="flex gap-2 mt-2">
+                <button
+                  onClick={() => onEdgeStyleChange('gradient')}
+                  className={`flex-1 py-2 px-3 text-xs font-medium rounded-lg transition-colors flex items-center justify-center gap-1.5 ${
+                    edgeStyle === 'gradient'
+                      ? 'bg-purple-600 text-white'
+                      : 'bg-slate-700 text-slate-400'
+                  }`}
+                >
+                  <Palette className="w-3.5 h-3.5" />
+                  Gradient
+                </button>
+                <button
+                  onClick={() => onEdgeStyleChange('flat')}
+                  className={`flex-1 py-2 px-3 text-xs font-medium rounded-lg transition-colors flex items-center justify-center gap-1.5 ${
+                    edgeStyle === 'flat'
+                      ? 'bg-purple-600 text-white'
+                      : 'bg-slate-700 text-slate-400'
+                  }`}
+                >
+                  <Minus className="w-3.5 h-3.5" />
+                  Flat
+                </button>
+              </div>
+            )}
           </>
         )}
       </div>
@@ -228,6 +268,8 @@ export const MobileJoinsPanel: React.FC<MobileJoinsPanelProps> = ({
             {filteredRelationships.map((rel) => {
               const sourceTable = tables.find((t) => t.id === rel.sourceTable);
               const targetTable = tables.find((t) => t.id === rel.targetTable);
+              const srcColor = tableColorMap[rel.sourceTable] || '#3b82f6';
+              const tgtColor = tableColorMap[rel.targetTable] || '#8b5cf6';
               const isActive = activeRelationships.has(rel.id);
               const chain = findChain(rel.id);
               const hasChain = chain.length > 1;
@@ -237,9 +279,15 @@ export const MobileJoinsPanel: React.FC<MobileJoinsPanelProps> = ({
                   key={rel.id}
                   className={`rounded-xl border transition-all ${
                     isActive
-                      ? 'bg-cyan-500/20 border-cyan-500/50'
+                      ? 'bg-slate-700/50 border-slate-600'
                       : 'bg-slate-700/30 border-slate-700 active:bg-slate-700/50'
                   }`}
+                  style={{
+                    borderLeftWidth: '3px',
+                    borderLeftColor: srcColor,
+                    borderRightWidth: '3px',
+                    borderRightColor: tgtColor,
+                  }}
                 >
                   <button
                     onClick={() => onToggleRelationship(rel.id)}
@@ -250,28 +298,45 @@ export const MobileJoinsPanel: React.FC<MobileJoinsPanelProps> = ({
                       <div
                         className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 transition-all ${
                           isActive
-                            ? 'bg-cyan-500 text-white'
+                            ? 'bg-white/20 text-white'
                             : 'bg-slate-600 text-slate-400'
                         }`}
+                        style={isActive ? { backgroundColor: `${srcColor}40` } : undefined}
                       >
                         {isActive ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
                       </div>
 
                       {/* Join info */}
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1 text-xs">
-                          <span className={`font-medium ${isActive ? 'text-cyan-300' : 'text-white'}`}>
+                        <div className="flex items-center gap-1.5 text-xs">
+                          <div
+                            className="w-2 h-2 rounded-full flex-shrink-0"
+                            style={{ backgroundColor: srcColor }}
+                          />
+                          <span className="font-medium truncate" style={{ color: srcColor }}>
                             {sourceTable?.name}
                           </span>
                           <ArrowRight className="w-3 h-3 text-slate-500 flex-shrink-0" />
-                          <span className={`font-medium ${isActive ? 'text-blue-300' : 'text-white'}`}>
+                          <div
+                            className="w-2 h-2 rounded-full flex-shrink-0"
+                            style={{ backgroundColor: tgtColor }}
+                          />
+                          <span className="font-medium truncate" style={{ color: tgtColor }}>
                             {targetTable?.name}
                           </span>
                         </div>
-                        <div className="text-[10px] text-slate-500 mt-0.5">
+                        <div className="text-[10px] text-slate-500 mt-0.5 ml-3.5">
                           {rel.sourceColumn} → {rel.targetColumn}
                           <span className="mx-1">•</span>
-                          {rel.type === 'one-to-one' ? '1:1' : rel.type === 'one-to-many' ? '1:N' : 'N:M'}
+                          <span
+                            className="px-1 py-0.5 rounded font-bold"
+                            style={{
+                              background: `linear-gradient(90deg, ${srcColor}30, ${tgtColor}30)`,
+                              color: '#e2e8f0',
+                            }}
+                          >
+                            {rel.type === 'one-to-one' ? '1:1' : rel.type === 'one-to-many' ? '1:N' : 'N:M'}
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -285,7 +350,11 @@ export const MobileJoinsPanel: React.FC<MobileJoinsPanelProps> = ({
                           e.stopPropagation();
                           onAnimateChain(rel.id);
                         }}
-                        className="w-full py-2 text-xs font-medium bg-cyan-500/30 hover:bg-cyan-500/50 text-cyan-200 rounded-lg transition-colors flex items-center justify-center gap-2"
+                        className="w-full py-2 text-xs font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+                        style={{
+                          background: `linear-gradient(90deg, ${srcColor}40, ${tgtColor}40)`,
+                          color: '#e2e8f0',
+                        }}
                       >
                         <Play className="w-3.5 h-3.5" />
                         Trace {chain.length}-table chain
