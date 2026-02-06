@@ -124,32 +124,17 @@ const AppContent: React.FC = () => {
   }, []);
 
   const handleLoadDemo = useCallback(() => {
-    try {
-      console.log('handleLoadDemo: starting...');
-      const currentQuery = getCurrentDemoQuery();
-      const sql = currentQuery?.sql || '-- No demo queries configured';
-      const queryName = currentQuery?.name || 'E-commerce schema';
+    const currentQuery = getCurrentDemoQuery();
+    const sql = currentQuery?.sql || '-- No demo queries configured';
+    const queryName = currentQuery?.name || 'E-commerce schema';
 
-      console.log('handleLoadDemo: calling loadDemo...');
-      loadDemo(DEMO_TABLES, DEMO_RELATIONSHIPS, sql);
+    loadDemo(DEMO_TABLES, DEMO_RELATIONSHIPS, sql);
+    // Default all joins to ON when loading demo
+    setActiveRelationships(new Set(DEMO_RELATIONSHIPS.map(r => r.id)));
+    toast.success('Demo loaded!', queryName);
+    cycleToNextDemo();
 
-      console.log('handleLoadDemo: setting active relationships...');
-      // Default all joins to ON when loading demo
-      setActiveRelationships(new Set(DEMO_RELATIONSHIPS.map(r => r.id)));
-
-      console.log('handleLoadDemo: showing toast...');
-      toast.success('Demo loaded!', queryName);
-
-      console.log('handleLoadDemo: cycling demo...');
-      cycleToNextDemo(); // Advance to next query for next time
-
-      if (isMobile) setMobilePanel('canvas');
-      console.log('handleLoadDemo: complete!');
-    } catch (error) {
-      console.error('handleLoadDemo ERROR:', error);
-      // Show error on screen
-      alert('Error loading demo: ' + (error instanceof Error ? error.message : String(error)));
-    }
+    if (isMobile) setMobilePanel('canvas');
   }, [loadDemo, isMobile, getCurrentDemoQuery, cycleToNextDemo]);
 
   const handleStartFresh = useCallback(() => {

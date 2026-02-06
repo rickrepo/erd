@@ -22,6 +22,8 @@ function RelationshipEdge({
   const isAnimating = (data?.isAnimating as boolean) ?? false;
   const sourceColor = (data?.sourceColor as string) || '#3b82f6';
   const targetColor = (data?.targetColor as string) || '#8b5cf6';
+  const edgeStyle = (data?.edgeStyle as 'gradient' | 'flat') || 'gradient';
+  const isGradient = edgeStyle === 'gradient';
 
   const relType = relationship?.type || 'one-to-many';
 
@@ -139,13 +141,13 @@ function RelationshipEdge({
         }}
       />
 
-      {/* Subtle glow effect with gradient */}
+      {/* Subtle glow effect */}
       {showFullPath && (
         <BaseEdge
           id={`${id}-glow`}
           path={edgePath}
           style={{
-            stroke: `url(#${gradientId})`,
+            stroke: isGradient ? `url(#${gradientId})` : sourceColor,
             strokeWidth: strokeWidth + 6,
             strokeLinecap: 'round',
             filter: 'blur(6px)',
@@ -160,7 +162,7 @@ function RelationshipEdge({
           id={`${id}-trail`}
           path={edgePath}
           style={{
-            stroke: `url(#${gradientId})`,
+            stroke: isGradient ? `url(#${gradientId})` : sourceColor,
             strokeWidth: strokeWidth + 3,
             strokeLinecap: 'round',
             strokeDasharray: pathLength,
@@ -171,13 +173,13 @@ function RelationshipEdge({
         />
       )}
 
-      {/* Main edge with gradient */}
+      {/* Main edge */}
       <BaseEdge
         id={id}
         path={edgePath}
         style={{
           ...style,
-          stroke: `url(#${gradientId})`,
+          stroke: isGradient ? `url(#${gradientId})` : sourceColor,
           strokeWidth,
           strokeLinecap: 'round',
           strokeDasharray: isAnimating && !showFullPath ? pathLength : undefined,
@@ -213,7 +215,9 @@ function RelationshipEdge({
             <div
               className="px-2 py-0.5 rounded-md text-[10px] font-bold text-white shadow-lg"
               style={{
-                background: `linear-gradient(90deg, ${sourceColor}, ${targetColor})`,
+                background: isGradient
+                  ? `linear-gradient(90deg, ${sourceColor}, ${targetColor})`
+                  : sourceColor,
                 border: '1px solid rgba(255,255,255,0.3)',
               }}
             >

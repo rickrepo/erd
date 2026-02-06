@@ -34,6 +34,8 @@ import {
   Network,
   GitBranch,
   Download,
+  Palette,
+  Minus,
 } from 'lucide-react';
 import type { Column } from '../../types';
 
@@ -135,6 +137,7 @@ const ERDCanvas: React.FC<ERDCanvasProps> = ({
 
   const [layoutType, setLayoutType] = useState<LayoutType>('hierarchical');
   const [showExport, setShowExport] = useState(false);
+  const [edgeStyle, setEdgeStyle] = useState<'gradient' | 'flat'>('gradient');
   const { fitView, screenToFlowPosition } = useReactFlow();
 
   // Track if we've done the initial animation
@@ -444,9 +447,10 @@ const ERDCanvas: React.FC<ERDCanvasProps> = ({
         ...edge.data,
         isActive: activeRelationships.has(edge.id),
         isAnimating: animatingRelationship === edge.id,
+        edgeStyle,
       },
     }));
-  }, [relationships, tables, nodePositions, activeRelationships, animatingRelationship]);
+  }, [relationships, tables, nodePositions, activeRelationships, animatingRelationship, edgeStyle]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
@@ -468,6 +472,18 @@ const ERDCanvas: React.FC<ERDCanvasProps> = ({
       setNodes(initialNodes);
     }
   }, [initialNodes, setNodes, tables]);
+
+  // Update node positions when layout type changes
+  const prevLayoutTypeForNodesRef = useRef<LayoutType>(layoutType);
+  useEffect(() => {
+    if (isInitialMountRef.current) {
+      return;
+    }
+    if (layoutType !== prevLayoutTypeForNodesRef.current) {
+      prevLayoutTypeForNodesRef.current = layoutType;
+      setNodes(initialNodes);
+    }
+  }, [layoutType, initialNodes, setNodes]);
 
   // Update edges when relationships actually change (skip initial mount)
   useEffect(() => {
@@ -513,6 +529,45 @@ const ERDCanvas: React.FC<ERDCanvasProps> = ({
       }))
     );
   }, [animatingRelationship, setEdges]);
+
+  // Update edge style when changed
+  useEffect(() => {
+    setEdges((eds) =>
+      eds.map((edge) => ({
+        ...edge,
+        data: {
+          ...edge.data,
+          edgeStyle,
+        },
+      }))
+    );
+  }, [edgeStyle, setEdges]);
+
+  // Auto-cycle join animations every 8 seconds when there are active relationships
+  useEffect(() => {
+    if (activeRelationships.size === 0 || relationships.length === 0) return;
+
+    const cycleAnimation = () => {
+      const activeRels = [...activeRelationships];
+      if (activeRels.length === 0) return;
+
+      // Pick a random relationship to animate
+      const randomIndex = Math.floor(Math.random() * activeRels.length);
+      const relId = activeRels[randomIndex];
+
+      setAnimatingRelationship(relId);
+      setTimeout(() => setAnimatingRelationship(null), 800);
+    };
+
+    // Start cycle after 5 seconds, then repeat every 8 seconds
+    const initialDelay = setTimeout(cycleAnimation, 5000);
+    const interval = setInterval(cycleAnimation, 8000);
+
+    return () => {
+      clearTimeout(initialDelay);
+      clearInterval(interval);
+    };
+  }, [activeRelationships, relationships.length, setAnimatingRelationship]);
 
   // Mark initial mount as complete after first render cycle
   useEffect(() => {
@@ -963,6 +1018,34 @@ const ERDCanvas: React.FC<ERDCanvasProps> = ({
               <span className="hidden sm:inline">Tree</span>
             </button>
           </div>
+
+          {/* Edge Style Toggle */}
+          <div className="bg-slate-800/95 backdrop-blur-sm rounded-lg p-1 flex gap-1 shadow-lg border border-slate-700/80">
+            <button
+              onClick={() => setEdgeStyle('gradient')}
+              className={`px-3 py-2 rounded-md text-xs font-medium transition-all flex items-center gap-1.5 ${
+                edgeStyle === 'gradient'
+                  ? 'bg-purple-600 text-white shadow-inner'
+                  : 'hover:bg-slate-700/80 text-slate-400 hover:text-white'
+              }`}
+              title="Gradient Lines"
+            >
+              <Palette className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Gradient</span>
+            </button>
+            <button
+              onClick={() => setEdgeStyle('flat')}
+              className={`px-3 py-2 rounded-md text-xs font-medium transition-all flex items-center gap-1.5 ${
+                edgeStyle === 'flat'
+                  ? 'bg-purple-600 text-white shadow-inner'
+                  : 'hover:bg-slate-700/80 text-slate-400 hover:text-white'
+              }`}
+              title="Flat Lines"
+            >
+              <Minus className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Flat</span>
+            </button>
+          </div>
         </Panel>
 
         {/* Actions - Desktop only */}
@@ -1063,8 +1146,8 @@ const ERDCanvas: React.FC<ERDCanvasProps> = ({
             </div>
           </div>
 
-          {/* Top-right corner badge */}
-          <div className="absolute top-4 right-4 select-none opacity-70">
+          {/* Bottom-left corner badge - moved to avoid overlap with export panel */}
+          <div className="absolute bottom-4 left-4 select-none opacity-70">
             <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-800/80 rounded-lg border border-slate-700/50">
               <div className="w-2 h-2 rounded-full bg-purple-500" />
               <span className="text-xs font-semibold text-slate-400">
@@ -1074,15 +1157,6 @@ const ERDCanvas: React.FC<ERDCanvasProps> = ({
           </div>
         </div>
       )}
-
-      {/* Debug panel - ALWAYS shows to diagnose rendering issues */}
-      <div className="absolute bottom-20 left-4 bg-black/90 text-white p-3 rounded-lg z-50 text-xs font-mono">
-        <p>allTables: {allTables.length}</p>
-        <p>filtered tables: {tables.length}</p>
-        <p>nodes: {nodes.length}</p>
-        <p>hiddenTables: {hiddenTables.size}</p>
-        <p>relationships: {relationships.length}</p>
-      </div>
     </div>
   );
 };
