@@ -46,58 +46,66 @@ const AppContent: React.FC = () => {
   // Auto-hide tables when all their relationships are hidden
   // DISABLED for demo mode - show all tables always
   useEffect(() => {
-    // In demo mode, never hide any tables
-    if (isDemoMode) {
-      setHiddenTables(new Set());
-      return;
-    }
-
-    // Don't hide anything if no active relationships or no tables
-    if (activeRelationships.size === 0 || tables.length === 0) {
-      setHiddenTables(new Set());
-      return;
-    }
-
-    // Guard against race condition: ensure active relationships match current relationships
-    const relationshipIds = new Set(relationships.map(r => r.id));
-    const validActiveCount = [...activeRelationships].filter(id => relationshipIds.has(id)).length;
-
-    // If none of the active relationships exist in current data, we're in a transitional state
-    if (validActiveCount === 0) {
-      setHiddenTables(new Set());
-      return;
-    }
-
-    const tablesWithVisibleRelationships = new Set<string>();
-    for (const relId of activeRelationships) {
-      const rel = relationships.find(r => r.id === relId);
-      if (rel) {
-        tablesWithVisibleRelationships.add(rel.sourceTable);
-        tablesWithVisibleRelationships.add(rel.targetTable);
+    // Use functional update to avoid infinite loops from creating new Set objects
+    setHiddenTables(prev => {
+      // In demo mode, never hide any tables
+      if (isDemoMode) {
+        return prev.size === 0 ? prev : new Set();
       }
-    }
 
-    // Auto-hide tables that have no visible relationships
-    const newHiddenTables = new Set<string>();
-    for (const table of tables) {
-      const hasVisibleRelationship = tablesWithVisibleRelationships.has(table.id);
-      const hasAnyRelationship = relationships.some(
-        r => r.sourceTable === table.id || r.targetTable === table.id
-      );
-
-      // Only auto-hide if table has relationships but none are visible
-      if (hasAnyRelationship && !hasVisibleRelationship) {
-        newHiddenTables.add(table.id);
+      // Don't hide anything if no active relationships or no tables
+      if (activeRelationships.size === 0 || tables.length === 0) {
+        return prev.size === 0 ? prev : new Set();
       }
-    }
 
-    // Safety check: NEVER hide ALL tables - that would result in blank screen
-    if (newHiddenTables.size >= tables.length) {
-      setHiddenTables(new Set());
-      return;
-    }
+      // Guard against race condition: ensure active relationships match current relationships
+      const relationshipIds = new Set(relationships.map(r => r.id));
+      const validActiveCount = [...activeRelationships].filter(id => relationshipIds.has(id)).length;
 
-    setHiddenTables(newHiddenTables);
+      // If none of the active relationships exist in current data, we're in a transitional state
+      if (validActiveCount === 0) {
+        return prev.size === 0 ? prev : new Set();
+      }
+
+      const tablesWithVisibleRelationships = new Set<string>();
+      for (const relId of activeRelationships) {
+        const rel = relationships.find(r => r.id === relId);
+        if (rel) {
+          tablesWithVisibleRelationships.add(rel.sourceTable);
+          tablesWithVisibleRelationships.add(rel.targetTable);
+        }
+      }
+
+      // Auto-hide tables that have no visible relationships
+      const newHiddenTables = new Set<string>();
+      for (const table of tables) {
+        const hasVisibleRelationship = tablesWithVisibleRelationships.has(table.id);
+        const hasAnyRelationship = relationships.some(
+          r => r.sourceTable === table.id || r.targetTable === table.id
+        );
+
+        // Only auto-hide if table has relationships but none are visible
+        if (hasAnyRelationship && !hasVisibleRelationship) {
+          newHiddenTables.add(table.id);
+        }
+      }
+
+      // Safety check: NEVER hide ALL tables - that would result in blank screen
+      if (newHiddenTables.size >= tables.length) {
+        return prev.size === 0 ? prev : new Set();
+      }
+
+      // Only update if the hidden tables actually changed
+      if (newHiddenTables.size === prev.size) {
+        const prevArray = [...prev].sort();
+        const newArray = [...newHiddenTables].sort();
+        if (prevArray.every((id, i) => id === newArray[i])) {
+          return prev; // No change, return same reference
+        }
+      }
+
+      return newHiddenTables;
+    });
   }, [activeRelationships, relationships, tables, isDemoMode]);
 
   const { fitView } = useReactFlow();
