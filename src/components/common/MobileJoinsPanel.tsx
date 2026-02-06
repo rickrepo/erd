@@ -9,8 +9,11 @@ import {
   Filter,
   ChevronDown,
   Table as TableIcon,
+  Database,
 } from 'lucide-react';
 import { useStore } from '../../store/useStore';
+import { DEMO_TABLES, DEMO_RELATIONSHIPS, DEMO_SQL_QUERIES } from '../../utils/demoData';
+import { toast } from './Toast';
 
 interface MobileJoinsPanelProps {
   activeRelationships: Set<string>;
@@ -27,10 +30,15 @@ export const MobileJoinsPanel: React.FC<MobileJoinsPanelProps> = ({
   onHideAll,
   onAnimateChain,
 }) => {
-  const { tables, relationships } = useStore();
+  const { tables, relationships, loadDemo } = useStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterTable, setFilterTable] = useState<string | null>(null);
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
+
+  const handleLoadDemo = () => {
+    loadDemo(DEMO_TABLES, DEMO_RELATIONSHIPS, DEMO_SQL_QUERIES);
+    toast.success('Demo loaded!', 'E-commerce schema with sample SQL');
+  };
 
   // Filter relationships based on search and table filter
   const filteredRelationships = relationships.filter((rel) => {
@@ -188,11 +196,20 @@ export const MobileJoinsPanel: React.FC<MobileJoinsPanelProps> = ({
             <p className="text-sm text-slate-400 mb-1">
               {searchQuery || filterTable ? 'No matching joins' : 'No relationships yet'}
             </p>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-slate-500 mb-4">
               {searchQuery || filterTable
                 ? 'Try adjusting your filters'
-                : 'Import SQL to discover joins'}
+                : 'Import SQL or load demo to see joins'}
             </p>
+            {!searchQuery && !filterTable && relationships.length === 0 && (
+              <button
+                onClick={handleLoadDemo}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white text-sm font-medium rounded-lg transition-colors"
+              >
+                <Database className="w-4 h-4" />
+                Load Demo Data
+              </button>
+            )}
           </div>
         ) : (
           <div className="space-y-2">

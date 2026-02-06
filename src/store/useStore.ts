@@ -398,12 +398,13 @@ Try asking me questions about the schema!`,
     }),
     {
       name: 'schemaflow-data',
-      // Only persist structured schema data — never raw SQL or transient UI state
+      // Persist schema data and SQL input
       partialize: (state) => ({
         tables: state.tables,
         relationships: state.relationships,
         savedSchemas: state.savedSchemas,
         sqlDialect: state.sqlDialect,
+        sqlInput: state.sqlInput,
       }),
       storage: {
         getItem: (_name) => {
