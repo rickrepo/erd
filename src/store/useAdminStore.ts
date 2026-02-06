@@ -431,6 +431,9 @@ GROUP BY u.id, u.username, u.first_name, u.last_name;`,
   },
 ];
 
+// Version for demo queries - increment when queries change
+const DEMO_QUERIES_VERSION = 2;
+
 export const useAdminStore = create<AdminStore>()(
   persist(
     (set, get) => ({
@@ -572,6 +575,7 @@ export const useAdminStore = create<AdminStore>()(
     }),
     {
       name: 'schemaflow-admin',
+      version: DEMO_QUERIES_VERSION,
       partialize: (state) => ({
         isAdmin: state.isAdmin,
         users: state.users,
@@ -579,6 +583,18 @@ export const useAdminStore = create<AdminStore>()(
         demoQueries: state.demoQueries,
         currentDemoIndex: state.currentDemoIndex,
       }),
+      migrate: (persistedState: unknown, version: number) => {
+        const state = persistedState as Partial<AdminStore>;
+        // Reset demo queries when version changes to ensure fresh defaults
+        if (version < DEMO_QUERIES_VERSION) {
+          return {
+            ...state,
+            demoQueries: createDefaultDemoQueries(),
+            currentDemoIndex: 0,
+          };
+        }
+        return state as AdminStore;
+      },
     }
   )
 );

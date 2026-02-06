@@ -204,10 +204,15 @@ export function forceDirectedLayout(
 // Create edges from relationships with smart handle selection
 export function createEdges(
   relationships: Relationship[],
-  _tables: Table[],
+  tables: Table[],
   nodePositions?: Map<string, { x: number; y: number }>
 ): Edge[] {
+  // Build table color map
+  const tableColorMap = new Map(tables.map(t => [t.id, t.color]));
+
   return relationships.map(rel => {
+    const sourceColor = tableColorMap.get(rel.sourceTable) || '#3b82f6';
+    const targetColor = tableColorMap.get(rel.targetTable) || '#8b5cf6';
     // Determine best connection side based on relative positions
     let sourceHandle = `${rel.sourceColumn}-right`;
     let targetHandle = `${rel.targetColumn}-left`;
@@ -258,6 +263,8 @@ export function createEdges(
       data: {
         relationship: rel,
         label: `${rel.type === 'one-to-one' ? '1:1' : rel.type === 'one-to-many' ? '1:N' : 'N:M'}`,
+        sourceColor,
+        targetColor,
       },
     };
   });

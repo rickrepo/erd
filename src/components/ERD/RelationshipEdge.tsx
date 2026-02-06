@@ -20,6 +20,8 @@ function RelationshipEdge({
 
   const isActive = (data?.isActive as boolean) ?? false;
   const isAnimating = (data?.isAnimating as boolean) ?? false;
+  const sourceColor = (data?.sourceColor as string) || '#3b82f6';
+  const targetColor = (data?.targetColor as string) || '#8b5cf6';
 
   const relType = relationship?.type || 'one-to-many';
 
@@ -77,11 +79,18 @@ function RelationshipEdge({
     return null;
   }
 
-  // Better colors with higher contrast
-  const edgeColor = selected ? '#22d3ee' : '#06b6d4'; // Cyan for better visibility
-  const outlineColor = '#0f172a'; // Dark outline for contrast
-  const glowColor = '#67e8f9';
+  // Generate unique gradient ID for this edge
+  const gradientId = `gradient-${id}`;
+
+  // Calculate gradient direction based on source/target positions
+  const isLeftToRight = targetX >= sourceX;
+
+  // Dark outline for contrast
+  const outlineColor = '#0f172a';
   const strokeWidth = selected ? 3 : 2.5;
+
+  // For glow, blend the two colors
+  const glowColor = sourceColor;
 
   // Calculate stroke-dasharray for animation
   const pathLength = 1000;
@@ -89,6 +98,35 @@ function RelationshipEdge({
 
   return (
     <>
+      {/* SVG Gradient Definition */}
+      <svg style={{ position: 'absolute', width: 0, height: 0 }}>
+        <defs>
+          <linearGradient
+            id={gradientId}
+            x1={isLeftToRight ? '0%' : '100%'}
+            y1="0%"
+            x2={isLeftToRight ? '100%' : '0%'}
+            y2="0%"
+          >
+            <stop offset="0%" stopColor={sourceColor} />
+            <stop offset="50%" stopColor={selected ? '#22d3ee' : '#67e8f9'} />
+            <stop offset="100%" stopColor={targetColor} />
+          </linearGradient>
+          {/* Arrow marker matching target color */}
+          <marker
+            id={`arrow-${id}`}
+            viewBox="0 0 10 10"
+            refX="10"
+            refY="5"
+            markerWidth="6"
+            markerHeight="6"
+            orient="auto-start-reverse"
+          >
+            <path d="M 0 0 L 10 5 L 0 10 z" fill={targetColor} />
+          </marker>
+        </defs>
+      </svg>
+
       {/* Dark outline for contrast against any background */}
       <BaseEdge
         id={`${id}-outline`}
@@ -101,17 +139,17 @@ function RelationshipEdge({
         }}
       />
 
-      {/* Subtle glow effect */}
+      {/* Subtle glow effect with gradient */}
       {showFullPath && (
         <BaseEdge
           id={`${id}-glow`}
           path={edgePath}
           style={{
-            stroke: glowColor,
+            stroke: `url(#${gradientId})`,
             strokeWidth: strokeWidth + 6,
             strokeLinecap: 'round',
             filter: 'blur(6px)',
-            opacity: 0.4,
+            opacity: 0.5,
           }}
         />
       )}
@@ -122,7 +160,7 @@ function RelationshipEdge({
           id={`${id}-trail`}
           path={edgePath}
           style={{
-            stroke: glowColor,
+            stroke: `url(#${gradientId})`,
             strokeWidth: strokeWidth + 3,
             strokeLinecap: 'round',
             strokeDasharray: pathLength,
@@ -133,20 +171,20 @@ function RelationshipEdge({
         />
       )}
 
-      {/* Main edge */}
+      {/* Main edge with gradient */}
       <BaseEdge
         id={id}
         path={edgePath}
         style={{
           ...style,
-          stroke: edgeColor,
+          stroke: `url(#${gradientId})`,
           strokeWidth,
           strokeLinecap: 'round',
           strokeDasharray: isAnimating && !showFullPath ? pathLength : undefined,
           strokeDashoffset: isAnimating && !showFullPath ? dashOffset : undefined,
           transition: showFullPath ? 'all 0.3s ease-out' : undefined,
         }}
-        markerEnd={showFullPath ? `url(#arrow-cyan)` : undefined}
+        markerEnd={showFullPath ? `url(#arrow-${id})` : undefined}
       />
 
       {/* Animated dot traveling along the path */}
@@ -172,7 +210,13 @@ function RelationshipEdge({
               transition: 'opacity 0.2s ease-out',
             }}
           >
-            <div className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-cyan-600 text-white shadow-lg border border-cyan-400/50">
+            <div
+              className="px-2 py-0.5 rounded-md text-[10px] font-bold text-white shadow-lg"
+              style={{
+                background: `linear-gradient(90deg, ${sourceColor}, ${targetColor})`,
+                border: '1px solid rgba(255,255,255,0.3)',
+              }}
+            >
               {label}
             </div>
           </div>
