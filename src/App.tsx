@@ -240,7 +240,7 @@ const AppContent: React.FC = () => {
   ];
 
   return (
-    <div className="w-full h-screen flex flex-col bg-slate-900 overflow-hidden">
+    <div className="w-full h-[100dvh] flex flex-col bg-slate-900 overflow-hidden">
       {/* Top Header Bar */}
       <Header />
 
@@ -302,7 +302,7 @@ const AppContent: React.FC = () => {
             </div>
 
             {/* Mobile bottom navigation */}
-            <div className="flex-shrink-0 bg-slate-800 border-t border-slate-700 safe-area-bottom">
+            <div className="flex-shrink-0 bg-slate-800 border-t border-slate-700 safe-area-bottom z-50">
               <div className="flex">
                 {mobileTabs.map((tab) => (
                   <button

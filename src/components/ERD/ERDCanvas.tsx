@@ -305,7 +305,7 @@ const ERDCanvas: React.FC<ERDCanvasProps> = ({
     if (currentCount > prevCount && prevCount > 0) {
       // Small delay to let the layout settle
       const timer = setTimeout(() => {
-        fitView({ padding: 0.2, maxZoom: 1, duration: 300 });
+        fitView({ padding: 0.15, maxZoom: 0.8, duration: 300 });
       }, 100);
       return () => clearTimeout(timer);
     }
@@ -603,7 +603,7 @@ const ERDCanvas: React.FC<ERDCanvasProps> = ({
   // Re-layout with animation
   const handleLayout = useCallback((type: LayoutType) => {
     setLayoutType(type);
-    setTimeout(() => fitView({ padding: 0.2, maxZoom: 1, duration: 500 }), 100);
+    setTimeout(() => fitView({ padding: 0.15, maxZoom: 0.8, duration: 500 }), 100);
   }, [fitView]);
 
   // Build context menu items
@@ -767,7 +767,7 @@ const ERDCanvas: React.FC<ERDCanvasProps> = ({
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         fitView
-        fitViewOptions={{ padding: 0.2, maxZoom: 1 }}
+        fitViewOptions={{ padding: 0.15, maxZoom: 0.8 }}
         minZoom={0.1}
         maxZoom={1.5}
         defaultEdgeOptions={{
