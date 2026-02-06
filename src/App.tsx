@@ -111,16 +111,32 @@ const AppContent: React.FC = () => {
   }, []);
 
   const handleLoadDemo = useCallback(() => {
-    const currentQuery = getCurrentDemoQuery();
-    const sql = currentQuery?.sql || '-- No demo queries configured';
-    const queryName = currentQuery?.name || 'E-commerce schema';
+    try {
+      console.log('handleLoadDemo: starting...');
+      const currentQuery = getCurrentDemoQuery();
+      const sql = currentQuery?.sql || '-- No demo queries configured';
+      const queryName = currentQuery?.name || 'E-commerce schema';
 
-    loadDemo(DEMO_TABLES, DEMO_RELATIONSHIPS, sql);
-    // Default all joins to ON when loading demo
-    setActiveRelationships(new Set(DEMO_RELATIONSHIPS.map(r => r.id)));
-    toast.success('Demo loaded!', queryName);
-    cycleToNextDemo(); // Advance to next query for next time
-    if (isMobile) setMobilePanel('canvas');
+      console.log('handleLoadDemo: calling loadDemo...');
+      loadDemo(DEMO_TABLES, DEMO_RELATIONSHIPS, sql);
+
+      console.log('handleLoadDemo: setting active relationships...');
+      // Default all joins to ON when loading demo
+      setActiveRelationships(new Set(DEMO_RELATIONSHIPS.map(r => r.id)));
+
+      console.log('handleLoadDemo: showing toast...');
+      toast.success('Demo loaded!', queryName);
+
+      console.log('handleLoadDemo: cycling demo...');
+      cycleToNextDemo(); // Advance to next query for next time
+
+      if (isMobile) setMobilePanel('canvas');
+      console.log('handleLoadDemo: complete!');
+    } catch (error) {
+      console.error('handleLoadDemo ERROR:', error);
+      // Show error on screen
+      alert('Error loading demo: ' + (error instanceof Error ? error.message : String(error)));
+    }
   }, [loadDemo, isMobile, getCurrentDemoQuery, cycleToNextDemo]);
 
   const handleStartFresh = useCallback(() => {
@@ -281,7 +297,7 @@ const AppContent: React.FC = () => {
     <div className="w-full h-[100dvh] flex flex-col bg-slate-900 overflow-hidden">
       {/* Debug panel at TOP to trace App state */}
       <div className="fixed top-16 right-4 bg-green-900/95 text-white p-3 rounded-lg z-[200] text-xs font-mono border-2 border-green-500">
-        <p className="font-bold mb-1">APP DEBUG v1.9.6</p>
+        <p className="font-bold mb-1">APP DEBUG v1.9.7</p>
         <p>showWelcome: {showWelcome ? 'true' : 'false'}</p>
         <p>isDemoMode: {isDemoMode ? 'true' : 'false'}</p>
         <p>tables: {tables.length}</p>
