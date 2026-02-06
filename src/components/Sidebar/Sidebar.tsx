@@ -192,8 +192,18 @@ const Sidebar: React.FC<SidebarProps> = ({
   // Track the last processed SQL to avoid loops
   const lastProcessedSqlRef = useRef<string>('');
 
+  // Track if we're currently syncing to prevent loops
+  const isSyncingFromStoreRef = useRef(false);
+  const isSyncingToStoreRef = useRef(false);
+
   // Sync local SQL input with store (for demo mode and clear)
   useEffect(() => {
+    // Prevent loop - don't process if we just updated the store
+    if (isSyncingToStoreRef.current) {
+      isSyncingToStoreRef.current = false;
+      return;
+    }
+
     // Handle clear - when storeSqlInput becomes empty, clear local queries
     if (!storeSqlInput && sqlQueries.length > 0) {
       setSqlQueries([]);
@@ -212,6 +222,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       // Split store SQL into separate queries
       const split = splitSQLQueries(storeSqlInput);
       if (split.length > 0) {
+        isSyncingFromStoreRef.current = true;
         const newQueries = split.map((sql, idx) => ({
           id: `query-${Date.now()}-${idx}`,
           name: extractQueryName(sql),
@@ -223,10 +234,17 @@ const Sidebar: React.FC<SidebarProps> = ({
     }
   }, [storeSqlInput, sqlQueries]);
 
-  // Update store when queries change
+  // Update store when queries change (but not when syncing from store)
   useEffect(() => {
+    // Prevent loop - don't update store if we just got data from it
+    if (isSyncingFromStoreRef.current) {
+      isSyncingFromStoreRef.current = false;
+      return;
+    }
+
     const combined = sqlQueries.map(q => q.sql).join('\n\n');
     if (combined !== storeSqlInput) {
+      isSyncingToStoreRef.current = true;
       setStoreSqlInput(combined);
     }
   }, [sqlQueries, setStoreSqlInput, storeSqlInput]);

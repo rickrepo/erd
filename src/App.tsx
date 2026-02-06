@@ -44,7 +44,9 @@ const AppContent: React.FC = () => {
   const [hiddenTables, setHiddenTables] = useState<Set<string>>(new Set());
 
   // Auto-hide tables when all their relationships are hidden
-  // DISABLED for demo mode - show all tables always
+  // TEMPORARILY DISABLED to debug infinite loop
+  // The hiddenTables state is always empty for now
+  /*
   useEffect(() => {
     // Use functional update to avoid infinite loops from creating new Set objects
     setHiddenTables(prev => {
@@ -107,6 +109,7 @@ const AppContent: React.FC = () => {
       return newHiddenTables;
     });
   }, [activeRelationships, relationships, tables, isDemoMode]);
+  */
 
   const { fitView } = useReactFlow();
 
