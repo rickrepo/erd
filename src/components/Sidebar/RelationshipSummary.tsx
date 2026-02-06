@@ -27,11 +27,19 @@ const RelationshipSummary: React.FC = () => {
   const [textImport, setTextImport] = useState('');
   const [importResult, setImportResult] = useState<{ success: boolean; message: string } | null>(null);
 
-  // Build human-readable table name map
+  // Build human-readable table name and color map
   const tableNameMap = useMemo(() => {
     const map: Record<string, string> = {};
     tables.forEach((t) => {
       map[t.id] = t.name;
+    });
+    return map;
+  }, [tables]);
+
+  const tableColorMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    tables.forEach((t) => {
+      map[t.id] = t.color || '#3b82f6';
     });
     return map;
   }, [tables]);
@@ -291,6 +299,8 @@ const RelationshipSummary: React.FC = () => {
               {relationships.map((rel) => {
                 const srcName = tableNameMap[rel.sourceTable] || rel.sourceTable;
                 const tgtName = tableNameMap[rel.targetTable] || rel.targetTable;
+                const srcColor = tableColorMap[rel.sourceTable] || '#3b82f6';
+                const tgtColor = tableColorMap[rel.targetTable] || '#8b5cf6';
                 const typeLabel =
                   rel.type === 'one-to-one' ? '1:1' :
                   rel.type === 'one-to-many' ? '1:N' : 'N:M';
@@ -299,19 +309,41 @@ const RelationshipSummary: React.FC = () => {
                   <div
                     key={rel.id}
                     className="p-3 bg-slate-700/50 rounded-lg border border-slate-600 hover:border-slate-500 transition-colors group"
+                    style={{
+                      borderLeftWidth: '3px',
+                      borderLeftColor: srcColor,
+                      borderRightWidth: '3px',
+                      borderRightColor: tgtColor,
+                    }}
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1.5 text-xs">
-                          <span className="text-blue-300 font-medium truncate">{srcName}</span>
+                          <div
+                            className="w-2 h-2 rounded-full flex-shrink-0"
+                            style={{ backgroundColor: srcColor }}
+                          />
+                          <span className="font-medium truncate" style={{ color: srcColor }}>{srcName}</span>
                           <span className="text-slate-500">.{rel.sourceColumn}</span>
                         </div>
-                        <div className="flex items-center gap-1.5 text-[10px] text-slate-500 my-0.5">
-                          <span className="px-1.5 py-0.5 bg-indigo-500/20 text-indigo-300 rounded font-bold">{typeLabel}</span>
+                        <div className="flex items-center gap-1.5 text-[10px] text-slate-500 my-1 ml-3">
+                          <span
+                            className="px-1.5 py-0.5 rounded font-bold"
+                            style={{
+                              background: `linear-gradient(90deg, ${srcColor}30, ${tgtColor}30)`,
+                              color: '#e2e8f0',
+                            }}
+                          >
+                            {typeLabel}
+                          </span>
                           <span>→</span>
                         </div>
                         <div className="flex items-center gap-1.5 text-xs">
-                          <span className="text-purple-300 font-medium truncate">{tgtName}</span>
+                          <div
+                            className="w-2 h-2 rounded-full flex-shrink-0"
+                            style={{ backgroundColor: tgtColor }}
+                          />
+                          <span className="font-medium truncate" style={{ color: tgtColor }}>{tgtName}</span>
                           <span className="text-slate-500">.{rel.targetColumn}</span>
                         </div>
                       </div>

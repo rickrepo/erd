@@ -36,6 +36,8 @@ import {
   Download,
   Palette,
   Minus,
+  EyeOff,
+  Eye,
 } from 'lucide-react';
 import type { Column } from '../../types';
 
@@ -1046,6 +1048,31 @@ const ERDCanvas: React.FC<ERDCanvasProps> = ({
               <span className="hidden sm:inline">Flat</span>
             </button>
           </div>
+
+          {/* Joins Visibility Toggle */}
+          {relationships.length > 0 && (
+            <div className="bg-slate-800/95 backdrop-blur-sm rounded-lg p-1 shadow-lg border border-slate-700/80">
+              {activeRelationships.size > 0 ? (
+                <button
+                  onClick={() => setActiveRelationships(new Set())}
+                  className="px-3 py-2 rounded-md text-xs font-medium transition-all flex items-center gap-1.5 hover:bg-slate-700/80 text-slate-400 hover:text-white"
+                  title="Hide All Joins"
+                >
+                  <EyeOff className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Hide Joins</span>
+                </button>
+              ) : (
+                <button
+                  onClick={() => setActiveRelationships(new Set(relationships.map(r => r.id)))}
+                  className="px-3 py-2 rounded-md text-xs font-medium transition-all flex items-center gap-1.5 bg-purple-600 text-white"
+                  title="Show All Joins"
+                >
+                  <Eye className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Show Joins</span>
+                </button>
+              )}
+            </div>
+          )}
         </Panel>
 
         {/* Actions - Desktop only */}
@@ -1163,8 +1190,8 @@ const ERDCanvas: React.FC<ERDCanvasProps> = ({
             </div>
           </div>
 
-          {/* Bottom-left corner badge - moved to avoid overlap with export panel */}
-          <div className="absolute bottom-4 left-4 select-none opacity-70">
+          {/* Bottom-left corner badge - above the footer */}
+          <div className="absolute bottom-14 left-4 select-none opacity-70">
             <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-800/80 rounded-lg border border-slate-700/50">
               <div className="w-2 h-2 rounded-full bg-purple-500" />
               <span className="text-xs font-semibold text-slate-400">
