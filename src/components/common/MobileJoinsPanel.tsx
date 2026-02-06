@@ -321,17 +321,50 @@ export const MobileJoinsPanel: React.FC<MobileJoinsPanelProps> = ({
       </div>
 
       {/* SQL Preview - bottom section */}
-      <SQLPreview />
+      <SQLPreview activeRelationships={activeRelationships} />
     </div>
   );
 };
 
-// SQL Preview sub-component
-const SQLPreview: React.FC = () => {
-  const { sqlInput } = useStore();
-  const [expanded, setExpanded] = useState(false);
+// Generate SQL text for joins
+function generateJoinSQL(relationships: any[], tables: any[], activeRelationships: Set<string>): string {
+  const activeRels = relationships.filter(r => activeRelationships.has(r.id));
+  if (activeRels.length === 0) return '';
 
-  if (!sqlInput) return null;
+  // Get unique tables involved
+  const tableIds = new Set<string>();
+  activeRels.forEach(rel => {
+    tableIds.add(rel.sourceTable);
+    tableIds.add(rel.targetTable);
+  });
+
+  const tableNames = Array.from(tableIds).map(id => {
+    const table = tables.find((t: any) => t.id === id);
+    return table?.name || id;
+  });
+
+  if (tableNames.length === 0) return '';
+
+  // Build JOIN clauses
+  const baseTable = tableNames[0];
+  const joinClauses = activeRels.map(rel => {
+    const sourceTable = tables.find((t: any) => t.id === rel.sourceTable);
+    const targetTable = tables.find((t: any) => t.id === rel.targetTable);
+    return `JOIN ${targetTable?.name} ON ${sourceTable?.name}.${rel.sourceColumn} = ${targetTable?.name}.${rel.targetColumn}`;
+  });
+
+  return `SELECT *\nFROM ${baseTable}\n${joinClauses.join('\n')};`;
+}
+
+// SQL Preview sub-component
+const SQLPreview: React.FC<{ activeRelationships: Set<string> }> = ({ activeRelationships }) => {
+  const { sqlInput, tables, relationships } = useStore();
+  const [expanded, setExpanded] = useState(false);
+  const [showGenerated, setShowGenerated] = useState(true);
+
+  const generatedSQL = generateJoinSQL(relationships, tables, activeRelationships);
+
+  if (!sqlInput && !generatedSQL) return null;
 
   return (
     <div className="flex-shrink-0 border-t border-slate-700">
@@ -341,7 +374,7 @@ const SQLPreview: React.FC = () => {
       >
         <span className="flex items-center gap-2">
           <TableIcon className="w-4 h-4 text-blue-400" />
-          SQL Query Used
+          SQL Joins
         </span>
         <ChevronDown
           className={`w-4 h-4 transition-transform ${expanded ? 'rotate-180' : ''}`}
@@ -349,10 +382,35 @@ const SQLPreview: React.FC = () => {
       </button>
 
       {expanded && (
-        <div className="px-3 pb-3 animate-slideIn">
+        <div className="px-3 pb-3 space-y-2 animate-slideIn">
+          {/* Toggle between generated and original */}
+          {sqlInput && generatedSQL && (
+            <div className="flex gap-1 mb-2">
+              <button
+                onClick={() => setShowGenerated(true)}
+                className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                  showGenerated ? 'bg-purple-600 text-white' : 'bg-slate-700 text-slate-400'
+                }`}
+              >
+                Active Joins
+              </button>
+              <button
+                onClick={() => setShowGenerated(false)}
+                className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                  !showGenerated ? 'bg-purple-600 text-white' : 'bg-slate-700 text-slate-400'
+                }`}
+              >
+                Original SQL
+              </button>
+            </div>
+          )}
+
           <pre className="p-2.5 bg-slate-900 rounded-lg text-xs text-slate-300 font-mono overflow-auto max-h-40 whitespace-pre-wrap">
-            {sqlInput.slice(0, 1000)}
-            {sqlInput.length > 1000 && '...'}
+            {showGenerated && generatedSQL
+              ? generatedSQL
+              : sqlInput
+              ? sqlInput.slice(0, 1000) + (sqlInput.length > 1000 ? '...' : '')
+              : generatedSQL || 'No SQL available'}
           </pre>
         </div>
       )}

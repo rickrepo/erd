@@ -127,7 +127,7 @@ const ERDCanvas: React.FC<ERDCanvasProps> = ({
     [allRelationships, hiddenTables]
   );
 
-  const { subscription, setShowPremiumModal } = useAuthStore();
+  const { subscription } = useAuthStore();
   const isPremium = subscription.tier === 'pro' || subscription.tier === 'enterprise';
 
   const [layoutType, setLayoutType] = useState<LayoutType>('hierarchical');
@@ -869,18 +869,6 @@ const ERDCanvas: React.FC<ERDCanvasProps> = ({
           )}
         </Panel>
 
-        {/* Stats - Bottom Left, above minimap */}
-        {tables.length > 0 && (
-          <Panel position="bottom-left" className="hidden lg:block !mb-[140px]">
-            <div className="bg-slate-800/80 backdrop-blur-sm rounded-xl px-4 py-2 shadow-xl border border-slate-700/50 text-sm">
-              <span className="text-white font-medium">{tables.length}</span>
-              <span className="text-slate-400 ml-1">tables</span>
-              <span className="text-slate-600 mx-2">·</span>
-              <span className="text-white font-medium">{relationships.length}</span>
-              <span className="text-slate-400 ml-1">joins</span>
-            </div>
-          </Panel>
-        )}
       </ReactFlow>
 
       {/* Empty State - Centered Overlay */}
@@ -922,24 +910,14 @@ const ERDCanvas: React.FC<ERDCanvasProps> = ({
         />
       )}
 
-      {/* Free tier watermark */}
+      {/* Free tier watermark - just the centered text */}
       {!isPremium && tables.length > 0 && (
-        <div className="absolute inset-0 pointer-events-none z-10">
-          {/* Centered watermark text */}
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="rotate-[-15deg] select-none opacity-[0.03]">
-              <div className="text-[60px] sm:text-[80px] lg:text-[120px] font-black text-white tracking-[0.2em]">
-                SchemaFlow
-              </div>
+        <div className="absolute inset-0 pointer-events-none z-10 flex items-center justify-center">
+          <div className="rotate-[-15deg] select-none opacity-[0.03]">
+            <div className="text-[60px] sm:text-[80px] lg:text-[120px] font-black text-white tracking-[0.2em]">
+              SchemaFlow
             </div>
           </div>
-          {/* Remove watermark button */}
-          <button
-            onClick={() => setShowPremiumModal(true, 'feature')}
-            className="pointer-events-auto absolute bottom-20 lg:bottom-4 right-4 px-3 py-1.5 bg-slate-800/90 backdrop-blur-sm text-slate-400 text-xs font-medium rounded-lg border border-slate-600 hover:border-purple-500 hover:text-purple-400 transition-all"
-          >
-            Remove watermark
-          </button>
         </div>
       )}
     </div>

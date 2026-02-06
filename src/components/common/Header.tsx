@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
-import { LogIn, Crown, Settings, LogOut, ChevronDown, Play, Trash2 } from 'lucide-react';
+import { LogIn, Crown, Settings, LogOut, ChevronDown, Play, Trash2, Shield } from 'lucide-react';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useStore } from '../../store/useStore';
+import { useAdminStore } from '../../store/useAdminStore';
 import { Branding } from './Branding';
 import { DEMO_TABLES, DEMO_RELATIONSHIPS, DEMO_SQL_QUERIES } from '../../utils/demoData';
 import { toast } from './Toast';
@@ -9,6 +10,7 @@ import { toast } from './Toast';
 export function Header() {
   const { user, subscription, logout, setShowAuthPage, setShowPremiumModal, isAdmin } = useAuthStore();
   const { tables, loadDemo, reset } = useStore();
+  const { setShowAdminPanel } = useAdminStore();
   const [showDropdown, setShowDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -135,6 +137,19 @@ export function Header() {
                   >
                     <Crown className="w-4 h-4" />
                     Upgrade to Pro
+                  </button>
+                )}
+
+                {isAdmin() && (
+                  <button
+                    onClick={() => {
+                      setShowDropdown(false);
+                      setShowAdminPanel(true);
+                    }}
+                    className="w-full px-3 py-2 flex items-center gap-2 text-sm text-red-400 hover:bg-slate-700 transition-colors"
+                  >
+                    <Shield className="w-4 h-4" />
+                    Admin Panel
                   </button>
                 )}
 
