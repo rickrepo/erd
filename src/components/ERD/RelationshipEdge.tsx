@@ -1,6 +1,26 @@
-import { memo, useEffect, useState } from 'react';
+import { memo, useEffect, useState, useRef } from 'react';
 import { BaseEdge, getSmoothStepPath, EdgeLabelRenderer } from '@xyflow/react';
 import type { EdgeProps } from '@xyflow/react';
+
+// Helper to interpolate between two hex colors
+function interpolateColor(color1: string, color2: string, factor: number): string {
+  const hex1 = color1.replace('#', '');
+  const hex2 = color2.replace('#', '');
+
+  const r1 = parseInt(hex1.substring(0, 2), 16);
+  const g1 = parseInt(hex1.substring(2, 4), 16);
+  const b1 = parseInt(hex1.substring(4, 6), 16);
+
+  const r2 = parseInt(hex2.substring(0, 2), 16);
+  const g2 = parseInt(hex2.substring(2, 4), 16);
+  const b2 = parseInt(hex2.substring(4, 6), 16);
+
+  const r = Math.round(r1 + (r2 - r1) * factor);
+  const g = Math.round(g1 + (g2 - g1) * factor);
+  const b = Math.round(b1 + (b2 - b1) * factor);
+
+  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+}
 
 function RelationshipEdge({
   id,
@@ -23,7 +43,7 @@ function RelationshipEdge({
   const sourceColor = (data?.sourceColor as string) || '#3b82f6';
   const targetColor = (data?.targetColor as string) || '#8b5cf6';
   const edgeStyle = (data?.edgeStyle as 'gradient' | 'flat') || 'gradient';
-  const isGradient = edgeStyle === 'gradient';
+  const shouldCycleColor = edgeStyle === 'gradient';
 
   const relType = relationship?.type || 'one-to-many';
 
@@ -42,10 +62,15 @@ function RelationshipEdge({
     borderRadius: 16,
   });
 
-  // Animation state for the glow trail effect
+  // Animation state for the draw-in effect
   const [animationProgress, setAnimationProgress] = useState(0);
   const [showFullPath, setShowFullPath] = useState(false);
 
+  // Color cycling state - continuously cycles between source and target colors
+  const [colorCycleProgress, setColorCycleProgress] = useState(0);
+  const colorCycleRef = useRef<number | null>(null);
+
+  // Draw-in animation effect
   useEffect(() => {
     if (isAnimating) {
       setAnimationProgress(0);
@@ -62,7 +87,8 @@ function RelationshipEdge({
         if (progress < 1) {
           requestAnimationFrame(animate);
         } else {
-          setShowFullPath(true);
+          // Smooth transition to full path
+          setTimeout(() => setShowFullPath(true), 50);
         }
       };
 
@@ -76,77 +102,56 @@ function RelationshipEdge({
     }
   }, [isAnimating, isActive]);
 
+  // Continuous color cycling animation
+  useEffect(() => {
+    if (!isActive || !shouldCycleColor) {
+      if (colorCycleRef.current) {
+        cancelAnimationFrame(colorCycleRef.current);
+        colorCycleRef.current = null;
+      }
+      return;
+    }
+
+    const cycleDuration = 4000; // 4 seconds for full cycle
+    const startTime = Date.now();
+
+    const animateColor = () => {
+      const elapsed = Date.now() - startTime;
+      // Use sine wave for smooth back-and-forth transition
+      const progress = (Math.sin((elapsed / cycleDuration) * Math.PI * 2) + 1) / 2;
+      setColorCycleProgress(progress);
+      colorCycleRef.current = requestAnimationFrame(animateColor);
+    };
+
+    colorCycleRef.current = requestAnimationFrame(animateColor);
+
+    return () => {
+      if (colorCycleRef.current) {
+        cancelAnimationFrame(colorCycleRef.current);
+      }
+    };
+  }, [isActive, shouldCycleColor]);
+
   // If not active, don't render the edge at all
   if (!isActive && !isAnimating) {
     return null;
   }
 
-  // Generate unique gradient ID for this edge
-  const gradientId = `gradient-${id}`;
-  const animatedGradientId = `animated-gradient-${id}`;
-
-  // Calculate gradient direction based on source/target positions
-  const isLeftToRight = targetX >= sourceX;
-
   // Dark outline for contrast
   const outlineColor = '#0f172a';
   const strokeWidth = selected ? 3.5 : 3;
 
-  // For glow animation, use source color
-  const glowColor = sourceColor;
+  // Calculate current color based on cycling progress
+  const currentColor = shouldCycleColor
+    ? interpolateColor(sourceColor, targetColor, colorCycleProgress)
+    : sourceColor;
 
-  // Calculate stroke-dasharray for animation
+  // Calculate stroke-dasharray for draw-in animation
   const pathLength = 1000;
   const dashOffset = pathLength * (1 - animationProgress);
 
-  // Calculate animated gradient stops - color transitions from source to target as it travels
-  const animatedStop1 = `${Math.max(0, animationProgress * 100 - 20)}%`;
-  const animatedStop2 = `${Math.min(100, animationProgress * 100 + 10)}%`;
-
   return (
     <>
-      {/* SVG Gradient Definition */}
-      <svg style={{ position: 'absolute', width: 0, height: 0 }}>
-        <defs>
-          {/* Static gradient from source table color to target table color */}
-          <linearGradient
-            id={gradientId}
-            x1={isLeftToRight ? '0%' : '100%'}
-            y1="0%"
-            x2={isLeftToRight ? '100%' : '0%'}
-            y2="0%"
-          >
-            <stop offset="0%" stopColor={sourceColor} />
-            <stop offset="100%" stopColor={targetColor} />
-          </linearGradient>
-          {/* Animated gradient - color travels from source to target */}
-          <linearGradient
-            id={animatedGradientId}
-            x1={isLeftToRight ? '0%' : '100%'}
-            y1="0%"
-            x2={isLeftToRight ? '100%' : '0%'}
-            y2="0%"
-          >
-            <stop offset="0%" stopColor={sourceColor} />
-            <stop offset={animatedStop1} stopColor={sourceColor} />
-            <stop offset={animatedStop2} stopColor={targetColor} />
-            <stop offset="100%" stopColor={targetColor} />
-          </linearGradient>
-          {/* Arrow marker matching target color */}
-          <marker
-            id={`arrow-${id}`}
-            viewBox="0 0 10 10"
-            refX="10"
-            refY="5"
-            markerWidth="8"
-            markerHeight="8"
-            orient="auto-start-reverse"
-          >
-            <path d="M 0 0 L 10 5 L 0 10 z" fill={targetColor} />
-          </marker>
-        </defs>
-      </svg>
-
       {/* Dark outline for contrast against any background */}
       <BaseEdge
         id={`${id}-outline`}
@@ -165,7 +170,7 @@ function RelationshipEdge({
           id={`${id}-glow`}
           path={edgePath}
           style={{
-            stroke: isGradient ? `url(#${gradientId})` : sourceColor,
+            stroke: currentColor,
             strokeWidth: strokeWidth + 6,
             strokeLinecap: 'round',
             filter: 'blur(6px)',
@@ -174,13 +179,13 @@ function RelationshipEdge({
         />
       )}
 
-      {/* Animated trail effect with color transition */}
+      {/* Animated trail effect during draw-in */}
       {isAnimating && !showFullPath && (
         <BaseEdge
           id={`${id}-trail`}
           path={edgePath}
           style={{
-            stroke: isGradient ? `url(#${animatedGradientId})` : sourceColor,
+            stroke: currentColor,
             strokeWidth: strokeWidth + 3,
             strokeLinecap: 'round',
             strokeDasharray: pathLength,
@@ -191,27 +196,23 @@ function RelationshipEdge({
         />
       )}
 
-      {/* Main edge - use animated gradient during animation, static when done */}
+      {/* Main edge - solid color that cycles between source and target */}
       <BaseEdge
         id={id}
         path={edgePath}
         style={{
           ...style,
-          stroke: isGradient
-            ? (isAnimating && !showFullPath ? `url(#${animatedGradientId})` : `url(#${gradientId})`)
-            : sourceColor,
+          stroke: currentColor,
           strokeWidth,
           strokeLinecap: 'round',
           strokeDasharray: isAnimating && !showFullPath ? pathLength : undefined,
           strokeDashoffset: isAnimating && !showFullPath ? dashOffset : undefined,
-          transition: showFullPath ? 'all 0.3s ease-out' : undefined,
         }}
-        markerEnd={showFullPath ? `url(#arrow-${id})` : undefined}
       />
 
-      {/* Animated dot traveling along the path */}
+      {/* Animated dot traveling along the path during draw-in */}
       {isAnimating && !showFullPath && (
-        <circle r="5" fill={glowColor} filter="url(#glow-filter)">
+        <circle r="5" fill={currentColor} filter="url(#glow-filter)">
           <animateMotion
             dur="0.6s"
             repeatCount="1"
@@ -235,9 +236,7 @@ function RelationshipEdge({
             <div
               className="px-2 py-0.5 rounded-md text-[10px] font-bold text-white shadow-lg"
               style={{
-                background: isGradient
-                  ? `linear-gradient(90deg, ${sourceColor}, ${targetColor})`
-                  : sourceColor,
+                background: currentColor,
                 border: '1px solid rgba(255,255,255,0.3)',
               }}
             >
