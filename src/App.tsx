@@ -273,8 +273,22 @@ const AppContent: React.FC = () => {
     { id: 'joins', label: 'Joins', icon: Link, badge: relationships.length },
   ];
 
+  // Debug: log to help diagnose
+  console.log('App render:', { showWelcome, isMobile, tables: tables.length, isDemoMode, hiddenTables: hiddenTables.size });
+
   return (
     <div className="w-full h-[100dvh] flex flex-col bg-slate-900 overflow-hidden">
+      {/* Debug panel at TOP to trace App state */}
+      <div className="fixed top-16 right-4 bg-green-900/95 text-white p-3 rounded-lg z-[200] text-xs font-mono border-2 border-green-500">
+        <p className="font-bold mb-1">APP DEBUG v1.9.5</p>
+        <p>showWelcome: {showWelcome ? 'true' : 'false'}</p>
+        <p>isDemoMode: {isDemoMode ? 'true' : 'false'}</p>
+        <p>tables: {tables.length}</p>
+        <p>relationships: {relationships.length}</p>
+        <p>isMobile: {isMobile ? 'true' : 'false'}</p>
+        <p>hiddenTables: {hiddenTables.size}</p>
+      </div>
+
       {/* Top Header Bar */}
       <Header />
 

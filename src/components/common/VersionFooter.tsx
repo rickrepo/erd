@@ -2,7 +2,7 @@ import { useStore } from '../../store/useStore';
 import { useAuthStore } from '../../store/useAuthStore';
 
 // Version footer - increment this with each push
-export const APP_VERSION = '1.9.3';
+export const APP_VERSION = '1.9.5';
 
 export function VersionFooter() {
   const { tables, relationships } = useStore();
