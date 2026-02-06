@@ -41,12 +41,14 @@ const AppContent: React.FC = () => {
   // Active relationships state - lifted to App for sharing between Sidebar and Canvas
   const [activeRelationships, setActiveRelationships] = useState<Set<string>>(new Set());
   const [animatingRelationship, setAnimatingRelationship] = useState<string | null>(null);
-  const [hiddenTables, setHiddenTables] = useState<Set<string>>(new Set());
+  // hiddenTables feature temporarily disabled - always empty
+  const [hiddenTables] = useState<Set<string>>(new Set());
 
   // Auto-hide tables when all their relationships are hidden
   // TEMPORARILY DISABLED to debug infinite loop
   // The hiddenTables state is always empty for now
   /*
+  const [hiddenTables, setHiddenTables] = useState<Set<string>>(new Set());
   useEffect(() => {
     // Use functional update to avoid infinite loops from creating new Set objects
     setHiddenTables(prev => {
