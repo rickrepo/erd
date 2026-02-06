@@ -22,7 +22,7 @@ type MobilePanel = 'sidebar' | 'canvas' | 'joins';
 
 // Inner component that has access to ReactFlow context
 const AppContent: React.FC = () => {
-  const { showWelcome, setShowWelcome, loadDemo, reset, tables, relationships } = useStore();
+  const { showWelcome, setShowWelcome, loadDemo, reset, tables, relationships, isDemoMode } = useStore();
   const {
     showPremiumModal,
     showUsageLimitModal,
@@ -43,7 +43,14 @@ const AppContent: React.FC = () => {
   const [hiddenTables, setHiddenTables] = useState<Set<string>>(new Set());
 
   // Auto-hide tables when all their relationships are hidden
+  // DISABLED for demo mode - show all tables always
   useEffect(() => {
+    // In demo mode, never hide any tables
+    if (isDemoMode) {
+      setHiddenTables(new Set());
+      return;
+    }
+
     // Don't hide anything if no active relationships or no tables
     if (activeRelationships.size === 0 || tables.length === 0) {
       setHiddenTables(new Set());
@@ -90,7 +97,7 @@ const AppContent: React.FC = () => {
     }
 
     setHiddenTables(newHiddenTables);
-  }, [activeRelationships, relationships, tables]);
+  }, [activeRelationships, relationships, tables, isDemoMode]);
 
   const { fitView } = useReactFlow();
 

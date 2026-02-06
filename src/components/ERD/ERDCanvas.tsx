@@ -1019,6 +1019,14 @@ const ERDCanvas: React.FC<ERDCanvasProps> = ({
           </div>
         </div>
       )}
+
+      {/* Debug indicator - shows table counts to diagnose rendering issues */}
+      {allTables.length > 0 && tables.length === 0 && (
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-red-900/90 text-white p-4 rounded-lg z-50">
+          <p className="font-bold">Debug: All {allTables.length} tables are hidden!</p>
+          <p className="text-sm">hiddenTables has {hiddenTables.size} entries</p>
+        </div>
+      )}
     </div>
   );
 };
