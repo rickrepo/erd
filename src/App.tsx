@@ -88,6 +88,8 @@ const AppContent: React.FC = () => {
     const queryName = currentQuery?.name || 'E-commerce schema';
 
     loadDemo(DEMO_TABLES, DEMO_RELATIONSHIPS, sql);
+    // Default all joins to ON when loading demo
+    setActiveRelationships(new Set(DEMO_RELATIONSHIPS.map(r => r.id)));
     toast.success('Demo loaded!', queryName);
     cycleToNextDemo(); // Advance to next query for next time
     if (isMobile) setMobilePanel('canvas');

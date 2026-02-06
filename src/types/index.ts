@@ -134,6 +134,11 @@ export interface UsageStats {
   lastResetDate: string; // ISO date string for daily reset
 }
 
+// Anonymous users (not logged in) get very limited access
+export const ANONYMOUS_LIMITS = {
+  maxGenerationsTotal: 2, // Total generations before requiring sign up
+};
+
 export const FREE_TIER_LIMITS: SubscriptionFeatures = {
   maxGenerationsPerDay: 3,
   aiMatchingEnabled: false,

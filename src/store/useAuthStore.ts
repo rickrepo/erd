@@ -1,7 +1,14 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { User, Subscription, UsageStats, SubscriptionFeatures } from '../types';
-import { FREE_TIER_LIMITS, PRO_TIER_FEATURES, ENTERPRISE_TIER_FEATURES } from '../types';
+import { FREE_TIER_LIMITS, PRO_TIER_FEATURES, ENTERPRISE_TIER_FEATURES, ANONYMOUS_LIMITS } from '../types';
+import {
+  getUsageData,
+  incrementAnonymousUsage,
+  canAnonymousGenerate,
+  getRemainingAnonymousGenerations,
+  linkUsageToUser,
+} from '../utils/usageTracking';
 import { switchUserStorage } from './useStore';
 import { useAdminStore } from './useAdminStore';
 
@@ -37,10 +44,11 @@ interface AuthStore {
   upgradeToEnterprise: () => Promise<boolean>;
 
   // Usage Actions
-  incrementUsage: () => boolean;
-  canGenerate: () => boolean;
-  getRemainingGenerations: () => number;
+  incrementUsage: () => Promise<boolean>;
+  canGenerate: () => Promise<boolean>;
+  getRemainingGenerations: () => Promise<number>;
   resetDailyUsage: () => void;
+  getAnonymousUsageData: () => Promise<{ used: number; limit: number; remaining: number }>;
 
   // Modal Actions
   setShowPremiumModal: (show: boolean, trigger?: 'limit' | 'feature' | 'upgrade') => void;
@@ -127,6 +135,9 @@ export const useAuthStore = create<AuthStore>()(
         // Load this user's saved schema data from their scoped storage
         setTimeout(() => switchUserStorage(), 0);
 
+        // Link anonymous usage to this user
+        await linkUsageToUser(user.id);
+
         // Log the login activity
         useAdminStore.getState().addActivityLog({
           userId: user.id,
@@ -152,6 +163,9 @@ export const useAuthStore = create<AuthStore>()(
         set({ user, showAuthPage: false });
         // Load this user's saved schema data from their scoped storage
         setTimeout(() => switchUserStorage(), 0);
+
+        // Link anonymous usage to this user
+        await linkUsageToUser(user.id);
 
         // Log the registration activity
         useAdminStore.getState().addActivityLog({
@@ -249,25 +263,43 @@ export const useAuthStore = create<AuthStore>()(
       },
 
       // Usage Actions
-      incrementUsage: () => {
-        const { usage, canGenerate, resetDailyUsage } = get();
+      incrementUsage: async () => {
+        const { user, usage, resetDailyUsage, isAdmin } = get();
 
-        // Check if we need to reset daily usage
+        // Admins have unlimited access
+        if (isAdmin()) {
+          return true;
+        }
+
+        // Anonymous user tracking (uses robust multi-storage fingerprinting)
+        if (!user) {
+          const canGen = await canAnonymousGenerate(ANONYMOUS_LIMITS.maxGenerationsTotal);
+          if (!canGen) {
+            set({ showUsageLimitModal: true });
+            return false;
+          }
+          await incrementAnonymousUsage();
+          return true;
+        }
+
+        // Registered user - daily limit tracking
         const today = getTodayDateString();
         if (usage.lastResetDate !== today) {
           resetDailyUsage();
         }
 
-        if (!canGenerate()) {
+        const currentUsage = get().usage;
+        const { subscription } = get();
+        if (currentUsage.generationsToday >= subscription.features.maxGenerationsPerDay) {
           set({ showUsageLimitModal: true });
           return false;
         }
 
         set({
           usage: {
-            ...usage,
-            generationsToday: usage.generationsToday + 1,
-            generationsTotal: usage.generationsTotal + 1,
+            ...currentUsage,
+            generationsToday: currentUsage.generationsToday + 1,
+            generationsTotal: currentUsage.generationsTotal + 1,
             lastGenerationAt: new Date(),
             lastResetDate: today,
           }
@@ -276,25 +308,52 @@ export const useAuthStore = create<AuthStore>()(
         return true;
       },
 
-      canGenerate: () => {
-        const { usage, subscription } = get();
+      canGenerate: async () => {
+        const { user, usage, subscription, isAdmin } = get();
 
-        // Check if we need to reset daily usage
+        // Admins always can generate
+        if (isAdmin()) {
+          return true;
+        }
+
+        // Anonymous user check
+        if (!user) {
+          return canAnonymousGenerate(ANONYMOUS_LIMITS.maxGenerationsTotal);
+        }
+
+        // Registered user check
         const today = getTodayDateString();
         const currentGenerations = usage.lastResetDate !== today ? 0 : usage.generationsToday;
-
         return currentGenerations < subscription.features.maxGenerationsPerDay;
       },
 
-      getRemainingGenerations: () => {
-        const { usage, subscription } = get();
+      getRemainingGenerations: async () => {
+        const { user, usage, subscription, isAdmin } = get();
 
-        // Check if we need to reset daily usage
+        // Admins have unlimited
+        if (isAdmin()) {
+          return Infinity;
+        }
+
+        // Anonymous user
+        if (!user) {
+          return getRemainingAnonymousGenerations(ANONYMOUS_LIMITS.maxGenerationsTotal);
+        }
+
+        // Registered user
         const today = getTodayDateString();
         const currentGenerations = usage.lastResetDate !== today ? 0 : usage.generationsToday;
-
         const remaining = subscription.features.maxGenerationsPerDay - currentGenerations;
         return Math.max(0, remaining);
+      },
+
+      getAnonymousUsageData: async () => {
+        const data = await getUsageData();
+        return {
+          used: data.anonymousGenerations,
+          limit: ANONYMOUS_LIMITS.maxGenerationsTotal,
+          remaining: Math.max(0, ANONYMOUS_LIMITS.maxGenerationsTotal - data.anonymousGenerations),
+        };
       },
 
       resetDailyUsage: () => {

@@ -796,7 +796,7 @@ const ERDCanvas: React.FC<ERDCanvasProps> = ({
             return data?.table?.color || '#3b82f6';
           }}
           maskColor="rgba(15, 23, 42, 0.9)"
-          className="!bg-slate-800/90 !border-slate-700 !rounded-xl !shadow-xl !hidden lg:!block"
+          className="!bg-slate-800/90 !border-slate-700 !rounded-xl !shadow-xl !hidden lg:!block !bottom-12"
           pannable
           zoomable
         />

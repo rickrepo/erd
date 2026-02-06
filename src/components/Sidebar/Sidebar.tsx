@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import type { SQLDialect } from '../../store/useStore';
+import { useAuthStore } from '../../store/useAuthStore';
 import { toast } from '../common/Toast';
 import { parseCreateTableStatements, inferRelationships, joinsToRelationships, parseSQLQueries, createTablesFromQuery } from '../../utils/sqlParser';
 
@@ -107,6 +108,22 @@ function extractQueryName(sql: string): string {
 
 type SidebarTab = 'sql' | 'joins';
 
+// SQL syntax highlighting
+const highlightSQL = (sql: string): React.ReactNode => {
+  const keywords = /\b(SELECT|FROM|WHERE|JOIN|INNER|LEFT|RIGHT|OUTER|FULL|ON|AND|OR|AS|ORDER|BY|GROUP|HAVING|LIMIT|OFFSET|UNION|DISTINCT|INSERT|UPDATE|DELETE|CREATE|ALTER|DROP|TABLE|VIEW|INDEX|PRIMARY|FOREIGN|KEY|REFERENCES|CONSTRAINT|DEFAULT|NOT|NULL|IN|BETWEEN|LIKE|EXISTS|CASE|WHEN|THEN|ELSE|END|SET|VALUES|INTO|WITH|PROCEDURE|FUNCTION|TRIGGER|SERIAL|INT|INTEGER|VARCHAR|CHAR|TEXT|BOOLEAN|BOOL|DATE|DATETIME|TIMESTAMP|DECIMAL|FLOAT|DOUBLE|NUMERIC|BIGINT|SMALLINT|AUTO_INCREMENT|IDENTITY|UNIQUE|CHECK)\b/gi;
+  const strings = /('[^']*')/g;
+  const comments = /(--[^\n]*)/g;
+  const numbers = /\b(\d+)\b/g;
+
+  // Apply highlighting via string replacement
+  const result = sql.replace(comments, '<span class="text-green-500">$1</span>')
+    .replace(strings, '<span class="text-amber-400">$1</span>')
+    .replace(keywords, '<span class="text-purple-400 font-semibold">$1</span>')
+    .replace(numbers, '<span class="text-cyan-400">$1</span>');
+
+  return <span dangerouslySetInnerHTML={{ __html: result }} />;
+};
+
 interface SidebarProps {
   activeRelationships?: Set<string>;
   onToggleRelationship?: (relId: string) => void;
@@ -134,8 +151,10 @@ const Sidebar: React.FC<SidebarProps> = ({
     setSqlInput: setStoreSqlInput,
   } = useStore();
 
+  const { incrementUsage, canGenerate, isAdmin } = useAuthStore();
+
   const [activeTab, setActiveTab] = useState<SidebarTab>('sql');
-  const [sqlExpanded, setSqlExpanded] = useState(tables.length === 0);
+  const [sqlExpanded, setSqlExpanded] = useState(true); // Always expanded by default
   const [sqlQueries, setSqlQueries] = useState<SQLQuery[]>([]);
   const [newQueryInput, setNewQueryInput] = useState('');
   const [showAddQuery, setShowAddQuery] = useState(false);
@@ -246,9 +265,24 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   const getCombinedSQL = () => sqlQueries.map(q => q.sql).join('\n\n');
 
-  const handleParseSQL = () => {
+  const handleParseSQL = async () => {
     const sqlInput = getCombinedSQL();
     if (!sqlInput.trim()) return;
+
+    // Check usage limits (admins bypass this)
+    if (!isAdmin()) {
+      const canProceed = await canGenerate();
+      if (!canProceed) {
+        // The usage limit modal will be shown automatically
+        return;
+      }
+
+      // Increment usage count
+      const success = await incrementUsage();
+      if (!success) {
+        return;
+      }
+    }
 
     try {
       // Try parsing as CREATE TABLE statements first
@@ -277,7 +311,8 @@ const Sidebar: React.FC<SidebarProps> = ({
 
         setTables(validTables);
         setRelationships(rels);
-        setSqlExpanded(false);
+        // Keep SQL expanded and switch to joins tab to show all relationships
+        if (onShowAll) onShowAll();
 
         toast.success(
           'Schema imported',
@@ -313,7 +348,8 @@ const Sidebar: React.FC<SidebarProps> = ({
 
         setTables(validNewTables);
         setRelationships(joinRels);
-        setSqlExpanded(false);
+        // Keep SQL expanded and switch to joins tab to show all relationships
+        if (onShowAll) onShowAll();
 
         toast.success(
           'Query analyzed',
@@ -454,8 +490,8 @@ const Sidebar: React.FC<SidebarProps> = ({
                         <Copy className="w-3 h-3" />
                       </button>
                     </div>
-                    <pre className="text-[10px] text-slate-400 font-mono max-h-32 overflow-auto whitespace-pre-wrap">
-                      {getCombinedSQL()}
+                    <pre className="text-[10px] font-mono max-h-32 overflow-auto whitespace-pre-wrap">
+                      {highlightSQL(getCombinedSQL())}
                     </pre>
                   </div>
                 )}
@@ -524,9 +560,9 @@ const Sidebar: React.FC<SidebarProps> = ({
                                 </button>
                               </div>
                             </div>
-                            <pre className="px-2.5 py-2 text-[10px] text-slate-400 font-mono max-h-20 overflow-auto whitespace-pre-wrap">
-                              {query.sql.substring(0, 300)}
-                              {query.sql.length > 300 && '...'}
+                            <pre className="px-2.5 py-2 text-[10px] font-mono max-h-20 overflow-auto whitespace-pre-wrap">
+                              {highlightSQL(query.sql.substring(0, 300))}
+                              {query.sql.length > 300 && <span className="text-slate-500">...</span>}
                             </pre>
                           </>
                         )}

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { LogIn, Crown, Settings, LogOut, ChevronDown, Play, Trash2, Shield } from 'lucide-react';
+import { LogIn, Crown, LogOut, ChevronDown, Play, Trash2, Shield, Zap } from 'lucide-react';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useStore } from '../../store/useStore';
 import { useAdminStore } from '../../store/useAdminStore';
@@ -9,11 +9,25 @@ import { toast } from './Toast';
 import { APP_VERSION } from './VersionFooter';
 
 export function Header() {
-  const { user, subscription, logout, setShowAuthPage, setShowPremiumModal, isAdmin } = useAuthStore();
+  const { user, subscription, logout, setShowAuthPage, setShowPremiumModal, isAdmin, getRemainingGenerations } = useAuthStore();
   const { tables, loadDemo, reset } = useStore();
   const { setShowAdminPanel, getCurrentDemoQuery, cycleToNextDemo } = useAdminStore();
   const [showDropdown, setShowDropdown] = useState(false);
+  const [remaining, setRemaining] = useState<number | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Load remaining generations
+  useEffect(() => {
+    const loadRemaining = async () => {
+      if (isAdmin()) {
+        setRemaining(null); // Unlimited for admins
+        return;
+      }
+      const rem = await getRemainingGenerations();
+      setRemaining(rem === Infinity ? null : rem);
+    };
+    loadRemaining();
+  }, [user, isAdmin, getRemainingGenerations]);
 
   const handleLoadDemo = () => {
     const currentQuery = getCurrentDemoQuery();
@@ -72,6 +86,23 @@ export function Header() {
 
       {/* Right: User actions */}
       <div className="flex items-center gap-2">
+        {/* Usage Indicator */}
+        {remaining !== null && !isAdmin() && (
+          <div
+            className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium ${
+              remaining === 0
+                ? 'bg-red-500/20 text-red-400'
+                : remaining <= 1
+                  ? 'bg-amber-500/20 text-amber-400'
+                  : 'bg-slate-700/50 text-slate-400'
+            }`}
+            title={user ? 'Daily generations remaining' : 'Free trial generations remaining'}
+          >
+            <Zap className="w-3 h-3" />
+            <span>{remaining} left</span>
+          </div>
+        )}
+
         {/* Load Demo / Clear buttons */}
         {tables.length === 0 ? (
           <button
@@ -158,17 +189,6 @@ export function Header() {
                     Admin Panel
                   </button>
                 )}
-
-                <button
-                  onClick={() => {
-                    setShowDropdown(false);
-                    // Could open settings
-                  }}
-                  className="w-full px-3 py-2 flex items-center gap-2 text-sm text-slate-300 hover:bg-slate-700 transition-colors"
-                >
-                  <Settings className="w-4 h-4" />
-                  Settings
-                </button>
 
                 <div className="border-t border-slate-700 mt-1 pt-1">
                   <button
