@@ -910,12 +910,39 @@ const ERDCanvas: React.FC<ERDCanvasProps> = ({
         />
       )}
 
-      {/* Free tier watermark - just the centered text */}
+      {/* Free tier watermarks - multiple visible watermarks */}
       {!isPremium && tables.length > 0 && (
-        <div className="absolute inset-0 pointer-events-none z-10 flex items-center justify-center">
-          <div className="rotate-[-15deg] select-none opacity-[0.03]">
-            <div className="text-[60px] sm:text-[80px] lg:text-[120px] font-black text-white tracking-[0.2em]">
+        <div className="absolute inset-0 pointer-events-none z-10 overflow-hidden">
+          {/* Center watermark - most prominent */}
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="rotate-[-12deg] select-none opacity-[0.08]">
+              <div className="text-[50px] sm:text-[70px] lg:text-[100px] font-black text-white tracking-[0.15em]">
+                SchemaFlow
+              </div>
+            </div>
+          </div>
+
+          {/* Top-left watermark */}
+          <div className="absolute top-20 left-10 rotate-[-12deg] select-none opacity-[0.06]">
+            <div className="text-[30px] sm:text-[40px] font-bold text-white tracking-wider">
               SchemaFlow
+            </div>
+          </div>
+
+          {/* Bottom-right watermark */}
+          <div className="absolute bottom-24 right-10 rotate-[-12deg] select-none opacity-[0.06]">
+            <div className="text-[30px] sm:text-[40px] font-bold text-white tracking-wider">
+              SchemaFlow
+            </div>
+          </div>
+
+          {/* Top-right corner badge */}
+          <div className="absolute top-4 right-4 select-none opacity-70">
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-800/80 rounded-lg border border-slate-700/50">
+              <div className="w-2 h-2 rounded-full bg-purple-500" />
+              <span className="text-xs font-semibold text-slate-400">
+                Made with <span className="text-purple-400">SchemaFlow</span>
+              </span>
             </div>
           </div>
         </div>

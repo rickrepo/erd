@@ -100,37 +100,52 @@ export function ExportPanel({ onClose }: ExportPanelProps) {
             canvas.height = img.height;
             ctx.drawImage(img, 0, 0);
 
-            // Draw branding watermark
-            const watermarkHeight = 32 * scale;
-            const padding = 16 * scale;
+            const padding = 20 * scale;
 
-            // Semi-transparent background for watermark
-            ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
-            ctx.roundRect(
-              padding,
-              canvas.height - watermarkHeight - padding,
-              200 * scale,
-              watermarkHeight,
-              8 * scale
-            );
-            ctx.fill();
+            // Draw prominent bottom banner
+            const bannerHeight = 48 * scale;
+            ctx.fillStyle = 'rgba(15, 23, 42, 0.95)';
+            ctx.fillRect(0, canvas.height - bannerHeight, canvas.width, bannerHeight);
 
-            // Draw text
+            // Gradient accent line at top of banner
+            const gradient = ctx.createLinearGradient(0, 0, canvas.width, 0);
+            gradient.addColorStop(0, '#8b5cf6');
+            gradient.addColorStop(0.5, '#06b6d4');
+            gradient.addColorStop(1, '#8b5cf6');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, canvas.height - bannerHeight, canvas.width, 2 * scale);
+
+            // Left side: SchemaFlow branding
             ctx.fillStyle = '#ffffff';
-            ctx.font = `bold ${14 * scale}px Inter, system-ui, sans-serif`;
+            ctx.font = `bold ${18 * scale}px Inter, system-ui, sans-serif`;
             ctx.fillText(
               'SchemaFlow',
-              padding + 12 * scale,
-              canvas.height - padding - 10 * scale
+              padding,
+              canvas.height - bannerHeight / 2 + 6 * scale
             );
 
-            ctx.fillStyle = '#94a3b8';
-            ctx.font = `${10 * scale}px Inter, system-ui, sans-serif`;
+            // Right side: URL
+            ctx.fillStyle = '#a855f7';
+            ctx.font = `${14 * scale}px Inter, system-ui, sans-serif`;
+            const urlText = 'schemaflow.io';
+            const urlWidth = ctx.measureText(urlText).width;
             ctx.fillText(
-              'schemaflow.io',
-              padding + 110 * scale,
-              canvas.height - padding - 10 * scale
+              urlText,
+              canvas.width - padding - urlWidth,
+              canvas.height - bannerHeight / 2 + 5 * scale
             );
+
+            // Center watermark text (subtle, over the diagram)
+            ctx.save();
+            ctx.globalAlpha = 0.04;
+            ctx.fillStyle = '#ffffff';
+            ctx.font = `bold ${80 * scale}px Inter, system-ui, sans-serif`;
+            ctx.translate(canvas.width / 2, canvas.height / 2 - bannerHeight / 2);
+            ctx.rotate(-12 * Math.PI / 180);
+            const watermarkText = 'SchemaFlow';
+            const textWidth = ctx.measureText(watermarkText).width;
+            ctx.fillText(watermarkText, -textWidth / 2, 0);
+            ctx.restore();
 
             dataUrl = canvas.toDataURL('image/png', 1.0);
             resolve();

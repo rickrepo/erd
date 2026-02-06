@@ -755,6 +755,9 @@ CREATE TABLE orders (
                   </p>
                 </div>
               )}
+
+              {/* Spacer for bottom bar */}
+              <div className="h-12" />
             </div>
           )}
 
