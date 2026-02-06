@@ -1,4 +1,5 @@
 import { X, Play, Upload, Sparkles, ArrowRight, Database, Download, MousePointer, Crown } from 'lucide-react';
+import { APP_VERSION } from './VersionFooter';
 
 interface WelcomeModalProps {
   onClose: () => void;
@@ -127,10 +128,14 @@ export function WelcomeModal({ onClose, onLoadDemo, onStartFresh }: WelcomeModal
             </button>
           </div>
 
-          {/* Footer hint - hidden on mobile */}
-          <p className="hidden sm:block text-center text-xs text-slate-500 mt-4">
-            Press <kbd className="px-1.5 py-0.5 bg-slate-700 rounded text-slate-400">Esc</kbd> to close
-          </p>
+          {/* Footer hint */}
+          <div className="flex items-center justify-between mt-4 text-xs text-slate-500">
+            <span className="text-slate-600">v{APP_VERSION}</span>
+            <p className="hidden sm:block">
+              Press <kbd className="px-1.5 py-0.5 bg-slate-700 rounded text-slate-400">Esc</kbd> to close
+            </p>
+            <span className="sm:hidden" />
+          </div>
         </div>
       </div>
     </div>

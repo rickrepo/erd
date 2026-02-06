@@ -44,18 +44,18 @@ const AppContent: React.FC = () => {
 
   // Auto-hide tables when all their relationships are hidden
   useEffect(() => {
-    // Don't hide anything if no active relationships
-    if (activeRelationships.size === 0) {
+    // Don't hide anything if no active relationships or no tables
+    if (activeRelationships.size === 0 || tables.length === 0) {
       setHiddenTables(new Set());
       return;
     }
 
-    // Guard against race condition: ensure relationships are loaded
-    // If active relationships reference IDs not in current relationships, skip
+    // Guard against race condition: ensure active relationships match current relationships
     const relationshipIds = new Set(relationships.map(r => r.id));
-    const activeAreValid = [...activeRelationships].some(id => relationshipIds.has(id));
-    if (!activeAreValid && relationships.length === 0) {
-      // Relationships haven't loaded yet, don't hide anything
+    const validActiveCount = [...activeRelationships].filter(id => relationshipIds.has(id)).length;
+
+    // If none of the active relationships exist in current data, we're in a transitional state
+    if (validActiveCount === 0) {
       setHiddenTables(new Set());
       return;
     }
@@ -81,6 +81,12 @@ const AppContent: React.FC = () => {
       if (hasAnyRelationship && !hasVisibleRelationship) {
         newHiddenTables.add(table.id);
       }
+    }
+
+    // Safety check: NEVER hide ALL tables - that would result in blank screen
+    if (newHiddenTables.size >= tables.length) {
+      setHiddenTables(new Set());
+      return;
     }
 
     setHiddenTables(newHiddenTables);
