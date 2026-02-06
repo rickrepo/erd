@@ -593,19 +593,14 @@ const ERDCanvas: React.FC<ERDCanvasProps> = ({
   }, [screenToFlowPosition]);
 
   const handleCreateTable = useCallback((name: string, flowPosition?: { x: number; y: number }) => {
-    const columns = [
-      { name: 'id', type: 'INT', isPrimaryKey: true, isForeignKey: false, isNullable: false },
-    ];
+    // Create table with no columns - user will add them via SQL or manually
     const newTable = {
       id: `table-${Date.now()}`,
       name,
-      columns,
+      columns: [] as { name: string; type: string; isPrimaryKey: boolean; isForeignKey: boolean; isNullable: boolean }[],
       color: getTableColor(tables.length),
     };
     addTable(newTable);
-
-    // Generate SQL for this table
-    appendTableSQL(name, columns);
 
     if (flowPosition) {
       setTimeout(() => {
@@ -619,7 +614,7 @@ const ERDCanvas: React.FC<ERDCanvasProps> = ({
 
     setQuickTableDialog(null);
     setSelectedTable(newTable.id);
-  }, [tables.length, addTable, setNodes, setSelectedTable, appendTableSQL]);
+  }, [tables.length, addTable, setNodes, setSelectedTable]);
 
   // Re-layout with animation
   const handleLayout = useCallback((type: LayoutType) => {
@@ -768,7 +763,7 @@ const ERDCanvas: React.FC<ERDCanvasProps> = ({
   }, [renamingTable, updateTable]);
 
   return (
-    <div className="w-full h-full relative">
+    <div className="w-full h-full relative bg-slate-900">
       <EdgeMarkerDefs />
 
       <ReactFlow
