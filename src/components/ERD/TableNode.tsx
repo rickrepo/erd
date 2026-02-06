@@ -1,7 +1,7 @@
 import { memo, useState } from 'react';
 import { Handle, Position } from '@xyflow/react';
 import type { NodeProps } from '@xyflow/react';
-import { Key, Link } from 'lucide-react';
+import { Key, Link, X, Plus } from 'lucide-react';
 import type { Table, Column } from '../../types';
 
 interface TableNodeData {
@@ -12,16 +12,21 @@ interface TableNodeData {
   onFKClick?: (tableId: string, columnName: string) => void;
   onColumnClick?: (column: Column) => void;
   onEditTable?: () => void;
+  onAddColumn?: (tableId: string) => void;
+  onDeleteColumn?: (tableId: string, columnName: string) => void;
+  onEditColumn?: (tableId: string, columnName: string, updates: Partial<Column>) => void;
   isExporting?: boolean;
 }
 
 // Professional ERD table node with glowing FK indicators
 function TableNode({ data, selected }: NodeProps) {
   const nodeData = data as unknown as TableNodeData;
-  const { table, onColumnClick, onFKClick, isExporting, isDimmed, activeRelationships } = nodeData;
+  const { table, onColumnClick, onFKClick, isExporting, isDimmed, activeRelationships, onAddColumn, onDeleteColumn, onEditColumn } = nodeData;
   const isSelected = selected || nodeData.isSelected;
   const [isHovered, setIsHovered] = useState(false);
   const [hoveredFK, setHoveredFK] = useState<string | null>(null);
+  const [editingColumn, setEditingColumn] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState('');
 
   const pkColumns = table.columns.filter(c => c.isPrimaryKey);
   const fkColumns = table.columns.filter(c => c.isForeignKey);
@@ -114,6 +119,19 @@ function TableNode({ data, selected }: NodeProps) {
             </div>
           </div>
         </div>
+        {/* Add column button */}
+        {!isExporting && onAddColumn && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onAddColumn(table.id);
+            }}
+            className="p-1.5 rounded-md bg-white/20 hover:bg-white/30 transition-colors"
+            title="Add column"
+          >
+            <Plus className="w-3.5 h-3.5 text-white" />
+          </button>
+        )}
       </div>
 
       {/* Columns */}
@@ -167,23 +185,71 @@ function TableNode({ data, selected }: NodeProps) {
                 )}
               </div>
 
-              {/* Column name */}
-              <span className={`
-                flex-1 font-medium truncate transition-colors duration-200
-                ${column.isPrimaryKey ? 'text-amber-300' :
-                  isActiveFK ? 'text-green-300' :
-                  column.isForeignKey ? 'text-blue-300' : 'text-slate-200'}
-                ${isHoveredFK ? 'text-blue-200' : ''}
-              `}>
-                {column.name}
-                {!column.isNullable && <span className="text-red-400 ml-0.5">*</span>}
-              </span>
+              {/* Column name - editable on double-click */}
+              {editingColumn === column.name ? (
+                <input
+                  type="text"
+                  value={editValue}
+                  onChange={(e) => setEditValue(e.target.value)}
+                  onBlur={() => {
+                    if (editValue.trim() && editValue !== column.name) {
+                      onEditColumn?.(table.id, column.name, { name: editValue.trim() });
+                    }
+                    setEditingColumn(null);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      if (editValue.trim() && editValue !== column.name) {
+                        onEditColumn?.(table.id, column.name, { name: editValue.trim() });
+                      }
+                      setEditingColumn(null);
+                    } else if (e.key === 'Escape') {
+                      setEditingColumn(null);
+                    }
+                  }}
+                  className="flex-1 bg-slate-700 text-white text-xs px-1 py-0.5 rounded outline-none border border-blue-500"
+                  autoFocus
+                  onClick={(e) => e.stopPropagation()}
+                />
+              ) : (
+                <span
+                  className={`
+                    flex-1 font-medium truncate transition-colors duration-200
+                    ${column.isPrimaryKey ? 'text-amber-300' :
+                      isActiveFK ? 'text-green-300' :
+                      column.isForeignKey ? 'text-blue-300' : 'text-slate-200'}
+                    ${isHoveredFK ? 'text-blue-200' : ''}
+                  `}
+                  onDoubleClick={(e) => {
+                    e.stopPropagation();
+                    setEditingColumn(column.name);
+                    setEditValue(column.name);
+                  }}
+                >
+                  {column.name}
+                  {!column.isNullable && <span className="text-red-400 ml-0.5">*</span>}
+                </span>
+              )}
 
               {/* FK target hint on hover */}
-              {isFK && column.references && isHoveredFK && (
+              {isFK && column.references && isHoveredFK && !editingColumn && (
                 <span className="text-[9px] text-blue-300 animate-fadeIn">
                   → {column.references.table}
                 </span>
+              )}
+
+              {/* Delete button on hover */}
+              {!isExporting && !editingColumn && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDeleteColumn?.(table.id, column.name);
+                  }}
+                  className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-red-500/30 rounded transition-all"
+                  title="Delete column"
+                >
+                  <X className="w-3 h-3 text-red-400" />
+                </button>
               )}
 
               {/* Column type badge */}

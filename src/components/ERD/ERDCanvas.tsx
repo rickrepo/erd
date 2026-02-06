@@ -109,6 +109,8 @@ const ERDCanvas: React.FC<ERDCanvasProps> = ({
     removeTable,
     addTable,
     addColumn,
+    updateColumn,
+    removeColumn,
     updateTable,
     selectedTable,
     sqlInput,
@@ -364,6 +366,63 @@ const ERDCanvas: React.FC<ERDCanvasProps> = ({
     userDraggedPositionsRef.current.set(node.id, node.position);
   }, []);
 
+  // Regenerate SQL for all tables
+  const regenerateAllSQL = useCallback(() => {
+    const currentTables = useStore.getState().tables;
+    if (currentTables.length === 0) {
+      setSqlInput('');
+      return;
+    }
+
+    const sqls = currentTables.map(table => {
+      if (table.columns.length === 0) {
+        return `-- ${table.name} (no columns yet)`;
+      }
+      const columnNames = table.columns.map(c => c.name).join(', ');
+      return `-- ${table.name} query\nSELECT ${columnNames}\nFROM ${table.name};`;
+    });
+    setSqlInput(sqls.join('\n\n'));
+  }, [setSqlInput]);
+
+  // Handle adding column to table
+  const handleAddColumnToTable = useCallback((tableId: string) => {
+    const table = tables.find(t => t.id === tableId);
+    // Generate unique column name
+    const existingNames = table?.columns.map(c => c.name) || [];
+    let suffix = 1;
+    let newName = 'new_column';
+    while (existingNames.includes(newName)) {
+      newName = `new_column_${suffix}`;
+      suffix++;
+    }
+
+    const col: Column = {
+      name: newName,
+      type: 'VARCHAR(255)',
+      isPrimaryKey: false,
+      isForeignKey: false,
+      isNullable: true,
+    };
+    addColumn(tableId, col);
+
+    // Sync SQL - regenerate the table's SQL
+    if (table) {
+      regenerateAllSQL();
+    }
+  }, [addColumn, tables, regenerateAllSQL]);
+
+  // Handle column deletion
+  const handleDeleteColumnFromTable = useCallback((tableId: string, columnName: string) => {
+    removeColumn(tableId, columnName);
+    regenerateAllSQL();
+  }, [removeColumn, regenerateAllSQL]);
+
+  // Handle column editing
+  const handleEditColumnInTable = useCallback((tableId: string, columnName: string, updates: Partial<Column>) => {
+    updateColumn(tableId, columnName, updates);
+    regenerateAllSQL();
+  }, [updateColumn, regenerateAllSQL]);
+
   // Calculate initial nodes - positions are stable, only data changes
   const initialNodes = useMemo(() => {
     return tables.map((table) => ({
@@ -375,9 +434,12 @@ const ERDCanvas: React.FC<ERDCanvasProps> = ({
         isSelected: false,
         activeRelationships: activeTableColumns,
         onFKClick: handleFKClick,
+        onAddColumn: handleAddColumnToTable,
+        onDeleteColumn: handleDeleteColumnFromTable,
+        onEditColumn: handleEditColumnInTable,
       },
     }));
-  }, [tables, nodePositions, activeTableColumns, handleFKClick]);
+  }, [tables, nodePositions, activeTableColumns, handleFKClick, handleAddColumnToTable, handleDeleteColumnFromTable, handleEditColumnInTable]);
 
   // Calculate edges with smart handle selection based on node positions
   const initialEdges = useMemo(() => {
@@ -558,17 +620,6 @@ const ERDCanvas: React.FC<ERDCanvasProps> = ({
     // Generate SQL for the duplicated table
     appendTableSQL(newTable.name, original.columns);
   }, [tables, addTable, appendTableSQL]);
-
-  const handleAddColumnToTable = useCallback((tableId: string) => {
-    const col: Column = {
-      name: `new_column`,
-      type: 'VARCHAR(255)',
-      isPrimaryKey: false,
-      isForeignKey: false,
-      isNullable: true,
-    };
-    addColumn(tableId, col);
-  }, [addColumn]);
 
   const handleDeleteRelationship = useCallback((relId: string) => {
     removeRelationship(relId);
