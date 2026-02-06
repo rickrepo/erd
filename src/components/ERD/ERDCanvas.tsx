@@ -482,6 +482,38 @@ const ERDCanvas: React.FC<ERDCanvasProps> = ({
     }
   }, [initialEdges, setEdges, relationships]);
 
+  // Update edge active state when activeRelationships changes
+  const prevActiveRelsRef = useRef<string>([...activeRelationships].sort().join(','));
+  useEffect(() => {
+    const currentActiveRels = [...activeRelationships].sort().join(',');
+    if (currentActiveRels !== prevActiveRelsRef.current) {
+      prevActiveRelsRef.current = currentActiveRels;
+      // Update edge data with new active states
+      setEdges((eds) =>
+        eds.map((edge) => ({
+          ...edge,
+          data: {
+            ...edge.data,
+            isActive: activeRelationships.has(edge.id),
+          },
+        }))
+      );
+    }
+  }, [activeRelationships, setEdges]);
+
+  // Update edge animating state when animatingRelationship changes
+  useEffect(() => {
+    setEdges((eds) =>
+      eds.map((edge) => ({
+        ...edge,
+        data: {
+          ...edge.data,
+          isAnimating: animatingRelationship === edge.id,
+        },
+      }))
+    );
+  }, [animatingRelationship, setEdges]);
+
   // Mark initial mount as complete after first render cycle
   useEffect(() => {
     isInitialMountRef.current = false;
