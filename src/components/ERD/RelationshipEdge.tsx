@@ -87,9 +87,9 @@ function RelationshipEdge({
 
   // Dark outline for contrast
   const outlineColor = '#0f172a';
-  const strokeWidth = selected ? 3 : 2.5;
+  const strokeWidth = selected ? 3.5 : 3;
 
-  // For glow, blend the two colors
+  // For glow animation, use source color
   const glowColor = sourceColor;
 
   // Calculate stroke-dasharray for animation
@@ -101,6 +101,7 @@ function RelationshipEdge({
       {/* SVG Gradient Definition */}
       <svg style={{ position: 'absolute', width: 0, height: 0 }}>
         <defs>
+          {/* Clean gradient from source table color to target table color */}
           <linearGradient
             id={gradientId}
             x1={isLeftToRight ? '0%' : '100%'}
@@ -109,7 +110,6 @@ function RelationshipEdge({
             y2="0%"
           >
             <stop offset="0%" stopColor={sourceColor} />
-            <stop offset="50%" stopColor={selected ? '#22d3ee' : '#67e8f9'} />
             <stop offset="100%" stopColor={targetColor} />
           </linearGradient>
           {/* Arrow marker matching target color */}
@@ -118,8 +118,8 @@ function RelationshipEdge({
             viewBox="0 0 10 10"
             refX="10"
             refY="5"
-            markerWidth="6"
-            markerHeight="6"
+            markerWidth="8"
+            markerHeight="8"
             orient="auto-start-reverse"
           >
             <path d="M 0 0 L 10 5 L 0 10 z" fill={targetColor} />

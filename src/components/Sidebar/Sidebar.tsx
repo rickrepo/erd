@@ -75,15 +75,27 @@ function splitSQLQueries(sql: string): string[] {
   // Split by SELECT (keeping the SELECT keyword)
   const queries: string[] = [];
   const parts = sql.split(/(?=\bSELECT\b)/gi);
+  let preamble = '';
 
   for (const part of parts) {
     const trimmed = part.trim();
     if (trimmed && /^SELECT\b/i.test(trimmed)) {
-      queries.push(trimmed);
+      // If we have a preamble, attach it to the first SELECT
+      if (preamble && queries.length === 0) {
+        queries.push(preamble + '\n' + trimmed);
+        preamble = '';
+      } else {
+        queries.push(trimmed);
+      }
     } else if (trimmed && queries.length === 0) {
-      // Handle any preamble (comments, etc.)
-      queries.push(trimmed);
+      // Store preamble (comments before first SELECT) to attach later
+      preamble = trimmed;
     }
+  }
+
+  // If only preamble exists with no SELECT, still return it
+  if (queries.length === 0 && preamble) {
+    queries.push(preamble);
   }
 
   return queries.filter(q => q.trim().length > 0);
@@ -177,9 +189,19 @@ const Sidebar: React.FC<SidebarProps> = ({
   const [filterTable, setFilterTable] = useState<string | null>(null);
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
 
+  // Track the last processed SQL to avoid loops
+  const lastProcessedSqlRef = useRef<string>('');
+
   // Sync local SQL input with store (for demo mode)
   useEffect(() => {
-    if (storeSqlInput && sqlQueries.length === 0) {
+    if (storeSqlInput && storeSqlInput !== lastProcessedSqlRef.current) {
+      // Check if current queries already match the store input
+      const currentCombined = sqlQueries.map(q => q.sql).join('\n\n');
+      if (currentCombined === storeSqlInput) {
+        lastProcessedSqlRef.current = storeSqlInput;
+        return;
+      }
+
       // Split store SQL into separate queries
       const split = splitSQLQueries(storeSqlInput);
       if (split.length > 0) {
@@ -189,9 +211,10 @@ const Sidebar: React.FC<SidebarProps> = ({
           sql,
         }));
         setSqlQueries(newQueries);
+        lastProcessedSqlRef.current = storeSqlInput;
       }
     }
-  }, [storeSqlInput]);
+  }, [storeSqlInput, sqlQueries]);
 
   // Update store when queries change
   useEffect(() => {
